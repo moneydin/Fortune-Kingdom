@@ -7,6 +7,7 @@ import {
 import { AdminConfig, GameState, SymbolType } from '../types';
 import { SlotSymbol } from './SlotSymbol';
 import { SlotMachine } from './SlotMachine';
+import { BackgroundMedia } from './BackgroundMedia';
 
 interface AdminPanelModalProps {
   isOpen: boolean;
@@ -547,14 +548,14 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-black/40 p-3 rounded-xl border border-red-900/40">
                     <div>
                       <label className="text-[11px] font-bold text-gray-300 block mb-1">
-                        Carregar Nova Imagem de Fundo:
+                        Carregar Fundo (Imagem ou Vídeo em Loop):
                       </label>
                       <label className="flex items-center justify-center gap-2 p-2 bg-black/60 border border-dashed border-red-700/50 hover:border-red-500 rounded-xl cursor-pointer text-xs font-bold text-red-300 transition">
                         <Upload className="w-4 h-4 text-red-400" />
-                        <span>Selecionar Arquivo do Computador</span>
+                        <span>Selecionar Imagem ou Vídeo (MP4, WebM)</span>
                         <input
                           type="file"
-                          accept="image/*"
+                          accept="image/*,video/*,video/mp4,video/webm,video/ogg"
                           onChange={handleBgFileUpload}
                           className="hidden"
                         />
@@ -563,14 +564,14 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
                     <div>
                       <label className="text-[11px] font-bold text-gray-300 block mb-1">
-                        ou Cole a URL da Imagem:
+                        ou Cole a URL da Imagem / Vídeo:
                       </label>
                       <input
                         type="text"
-                        placeholder="https://exemplo.com/fundo.jpg"
+                        placeholder="https://exemplo.com/fundo.mp4 (ou .jpg, .png)"
                         value={adminConfig.bgImage}
                         onChange={(e) => onUpdateAdminConfig({ bgImage: e.target.value })}
-                        className="w-full px-3 py-2 bg-black/60 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-red-500"
+                        className="w-full px-3 py-2 bg-black/60 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-red-500 font-mono"
                       />
                     </div>
                   </div>
@@ -595,14 +596,12 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       onMouseLeave={handleMouseUp}
                       className="relative w-full aspect-video bg-black rounded-2xl border-2 border-red-600/60 overflow-hidden shadow-2xl cursor-grab active:cursor-grabbing select-none"
                     >
-                      {/* Background Image Layer */}
-                      <div 
-                        className="absolute inset-0 bg-cover bg-no-repeat transition-transform duration-75 pointer-events-none"
-                        style={{
-                          backgroundImage: `url("${adminConfig.bgImage || '/background.jpg'}")`,
-                          transform: `translate(${adminConfig.bgPosX || 0}%, ${adminConfig.bgPosY || 0}%) scale(${(adminConfig.bgZoom || 100) / 100})`,
-                          transformOrigin: 'center center',
-                        }}
+                      {/* Background Layer (Image or Loop Video) */}
+                      <BackgroundMedia 
+                        src={adminConfig.bgImage}
+                        posX={adminConfig.bgPosX}
+                        posY={adminConfig.bgPosY}
+                        zoom={adminConfig.bgZoom}
                       />
 
                       {/* Interactive Draggable & Resizable Slot Box Frame */}

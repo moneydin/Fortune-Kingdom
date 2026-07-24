@@ -4,6 +4,7 @@ import { SlotMachine } from './components/SlotMachine';
 import { SpinButton } from './components/SpinButton';
 import { GameMenuModal } from './components/GameMenuModal';
 import { AdminPanelModal } from './components/AdminPanelModal';
+import { BackgroundMedia } from './components/BackgroundMedia';
 import { GameState, SymbolType, AdminConfig, GameSettings, SpinHistoryItem } from './types';
 
 const ALL_SYMBOLS: SymbolType[] = ['King', 'Queen', 'Crown', 'Lion', 'Sword', 'Shield', 'Castle', 'Diamond', 'Coin', 'Dragon'];
@@ -204,14 +205,12 @@ export default function App() {
       <div 
         className="relative w-full max-w-[1280px] max-h-[100dvh] aspect-video bg-[#050914] shadow-2xl overflow-hidden flex items-center justify-center transition-all duration-100"
       >
-        {/* Background Image Layer - 100% Identical positioning to Admin Canvas */}
-        <div 
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none transition-all duration-75"
-          style={{ 
-            backgroundImage: `url("${adminConfig.bgImage || '/background.jpg'}")`,
-            transform: `translate(${adminConfig.bgPosX || 0}%, ${adminConfig.bgPosY || 0}%) scale(${(adminConfig.bgZoom || 100) / 100})`,
-            transformOrigin: 'center center',
-          }}
+        {/* Background Media Layer (Image or Infinite Loop Video) */}
+        <BackgroundMedia 
+          src={adminConfig.bgImage}
+          posX={adminConfig.bgPosX}
+          posY={adminConfig.bgPosY}
+          zoom={adminConfig.bgZoom}
         />
 
         {/* TOP INTERFACE BAR */}
