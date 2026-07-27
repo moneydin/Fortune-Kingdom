@@ -54,6 +54,9 @@ export const SlotMachine: React.FC<SlotMachineProps> = ({
           const reelDelay = isReelAnticipating 
             ? (index * staggerDelay + anticipationExtraDelay) 
             : (index * staggerDelay);
+          const antStartDelay = isReelAnticipating
+            ? Math.max(0, (index - 1) * staggerDelay)
+            : 0;
 
           return (
             <SlotReel 
@@ -70,6 +73,7 @@ export const SlotMachine: React.FC<SlotMachineProps> = ({
               bet={bet}
               customCashImages={customCashImages}
               isAnticipating={isReelAnticipating}
+              anticipationStartDelay={antStartDelay}
               slotHideGrid={slotHideGrid}
               anticipationColor={cashAnticipationColor}
             />

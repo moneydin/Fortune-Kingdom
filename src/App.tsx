@@ -55,7 +55,7 @@ const defaultAdminConfig: AdminConfig = {
   buyBonusMultiplier: 50,
   bonusFreeSpinsCount: 10,
   bonusMultiplierBoost: 2,
-  bonusForceWinType: 'big_win',
+  bonusForceWinType: 'none',
   bonusMediaUrl: '',
 
   // UI elements customization default
@@ -108,6 +108,9 @@ function loadAdminConfig(): AdminConfig {
       const merged = { ...defaultAdminConfig, ...parsed };
       if (parsed.customButtons && Array.isArray(parsed.customButtons)) {
         merged.customButtons = parsed.customButtons;
+      }
+      if (parsed.bonusForceWinType === 'big_win') {
+        merged.bonusForceWinType = 'none';
       }
       return merged;
     }
@@ -508,13 +511,13 @@ export default function App() {
     setCashGrid(resultCashGrid);
 
     const isTurbo = gameSettingsRef.current.turboMode;
-    const normalSpeed = adminConfig.spinSpeedNormal ?? 1200;
-    const turboSpeed = adminConfig.spinSpeedTurbo ?? 350;
+    const normalSpeed = adminConfig.spinSpeedNormal ?? 1500;
+    const turboSpeed = adminConfig.spinSpeedTurbo ?? 400;
     const baseSpeed = isTurbo ? turboSpeed : normalSpeed;
-    const stagger = isTurbo ? Math.max(30, Math.floor((adminConfig.reelStaggerDelay ?? 120) / 3)) : (adminConfig.reelStaggerDelay ?? 120);
-    const anticipationExtra = isAnticipating && !isTurbo ? 1800 : 0;
+    const stagger = isTurbo ? Math.max(40, Math.floor((adminConfig.reelStaggerDelay ?? 140) / 3)) : (adminConfig.reelStaggerDelay ?? 140);
+    const anticipationExtra = isAnticipating && !isTurbo ? 2200 : 0;
     const spinDuration = baseSpeed;
-    const totalPresentationDelay = baseSpeed + (cols - 1) * stagger + anticipationExtra + 100;
+    const totalPresentationDelay = baseSpeed + (cols - 1) * stagger + anticipationExtra + 120;
 
     // Trigger sequential reels stagger stop
     setTimeout(() => {
@@ -795,20 +798,24 @@ export default function App() {
 
   // Auto spin trigger effect with turbo mode and balance protection
   useEffect(() => {
-    if (gameSettings.isAutoSpinning && !gameState.isSpinning && !fullScreenCelebration) {
+    if (gameSettings.isAutoSpinning && !gameState.isSpinning && !fullScreenCelebration && pendingBonusAward === null) {
       if (gameState.balance < gameState.bet && !gameState.inBonusRound) {
         setGameSettings(prev => ({ ...prev, isAutoSpinning: false, autoSpinCount: 0 }));
         alert('Giros automáticos parados: Saldo insuficiente.');
         return;
       }
       
-      const delay = gameSettings.turboMode ? 200 : 800;
+      const hasWin = gameState.win > 0;
+      const baseDelay = gameSettings.turboMode ? 300 : 1000;
+      const winExtraDelay = hasWin ? (gameSettings.turboMode ? 1800 : 3600) : 0;
+      const totalDelay = baseDelay + winExtraDelay;
+
       const timer = setTimeout(() => {
         handleSpin();
-      }, delay);
+      }, totalDelay);
       return () => clearTimeout(timer);
     }
-  }, [gameSettings.isAutoSpinning, gameSettings.turboMode, gameState.isSpinning, gameState.balance, fullScreenCelebration]);
+  }, [gameSettings.isAutoSpinning, gameSettings.turboMode, gameState.isSpinning, gameState.balance, fullScreenCelebration, pendingBonusAward, gameState.win]);
 
   // Sequential win presentation effect
   useEffect(() => {
@@ -829,13 +836,18 @@ export default function App() {
 
   // Auto play free spins in bonus round sequentially
   useEffect(() => {
-    if (gameState.inBonusRound && (gameState.bonusSpinsRemaining ?? 0) > 0 && !gameState.isSpinning && !fullScreenCelebration) {
+    if (gameState.inBonusRound && (gameState.bonusSpinsRemaining ?? 0) > 0 && !gameState.isSpinning && !fullScreenCelebration && pendingBonusAward === null) {
+      const hasWin = gameState.win > 0;
+      const baseDelay = gameSettings.turboMode ? 500 : 1200;
+      const winExtraDelay = hasWin ? (gameSettings.turboMode ? 2000 : 3800) : 0;
+      const totalDelay = baseDelay + winExtraDelay;
+
       const timer = setTimeout(() => {
         handleSpin();
-      }, 1500);
+      }, totalDelay);
       return () => clearTimeout(timer);
     }
-  }, [gameState.inBonusRound, gameState.bonusSpinsRemaining, gameState.isSpinning, fullScreenCelebration]);
+  }, [gameState.inBonusRound, gameState.bonusSpinsRemaining, gameState.isSpinning, fullScreenCelebration, pendingBonusAward, gameState.win, gameSettings.turboMode]);
 
   // Combine engine-defined symbol images/emojis and custom user uploaded images
   const customSymbolsMap: Partial<Record<string, string>> = {};
@@ -1041,18 +1053,24 @@ export default function App() {
           </button>
         )}
 
-        {/* Sequential Animations Banner Overlay */}
-        {(adminConfig.showWinBanner !== false) && activeWinLineIndex !== null && winningLines[activeWinLineIndex] && (
-          <div className="absolute top-[18%] left-1/2 -translate-x-1/2 z-30 w-[85%] bg-gradient-to-r from-yellow-700/90 via-black/95 to-yellow-700/90 border-2 border-yellow-400 p-2 sm:p-2.5 rounded-xl text-center shadow-[0_4px_25px_rgba(251,191,36,0.6)] animate-bounce select-none pointer-events-none">
-            <span className="text-[9px] sm:text-[10px] text-yellow-300 font-extrabold uppercase tracking-widest block leading-none mb-0.5 animate-pulse">
-              Linha Vencedora! ({activeWinLineIndex + 1}/{winningLines.length})
-            </span>
-            <span className="text-xs sm:text-sm font-black text-white uppercase block leading-tight">
-              {winningLines[activeWinLineIndex].paylineName}
-            </span>
-            <span className="text-xs font-extrabold text-amber-300 font-mono block leading-none mt-0.5">
-              +R$ {winningLines[activeWinLineIndex].payoutAmount.toFixed(2)} (x{winningLines[activeWinLineIndex].multiplier})
-            </span>
+        {/* Sequential Win & Total Win Celebration Banner Overlay */}
+        {(adminConfig.showWinBanner !== false) && gameState.win > 0 && !gameState.isSpinning && (
+          <div className="absolute top-[18%] left-1/2 -translate-x-1/2 z-40 max-w-[90%] w-[320px] sm:w-[380px] bg-gradient-to-r from-[#2b1800]/95 via-black/95 to-[#2b1800]/95 border-2 border-yellow-400 p-2.5 sm:p-3 rounded-2xl text-center shadow-[0_0_40px_rgba(251,191,36,0.8)] animate-in zoom-in duration-300 pointer-events-none flex flex-col items-center">
+            <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-black text-yellow-300 uppercase tracking-widest">
+              <Sparkles className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400 animate-spin" />
+              <span>GANHO NA RODADA</span>
+              <Sparkles className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400 animate-spin" />
+            </div>
+            
+            <div className="text-2xl sm:text-4xl font-black text-amber-300 font-mono my-0.5 tracking-tight drop-shadow-[0_2px_10px_rgba(251,191,36,0.9)]">
+              <CounterUpAnimation targetValue={gameState.win} duration={Math.min(2600, Math.max(1000, gameState.win * 35))} />
+            </div>
+
+            {activeWinLineIndex !== null && winningLines[activeWinLineIndex] && (
+              <div className="text-[10px] sm:text-xs font-extrabold text-amber-200 uppercase truncate max-w-full px-2.5 py-0.5 bg-black/70 rounded-full border border-yellow-500/40">
+                {winningLines[activeWinLineIndex].paylineName} (+R$ {winningLines[activeWinLineIndex].payoutAmount.toFixed(2)})
+              </div>
+            )}
           </div>
         )}
 

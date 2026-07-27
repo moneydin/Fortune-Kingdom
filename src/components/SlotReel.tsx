@@ -16,6 +16,7 @@ interface SlotReelProps {
   bet?: number;
   customCashImages?: Record<number, string>;
   isAnticipating?: boolean;
+  anticipationStartDelay?: number;
   slotHideGrid?: boolean;
   anticipationColor?: 'gold' | 'red' | 'purple' | 'cyan' | 'neon_green';
 }
@@ -68,13 +69,16 @@ export const SlotReel: React.FC<SlotReelProps> = ({
   bet,
   customCashImages,
   isAnticipating = false,
+  anticipationStartDelay = 0,
   slotHideGrid = false,
   anticipationColor = 'gold'
 }) => {
   const [currentSymbols, setCurrentSymbols] = useState<string[]>(resultSymbols);
   const [reelSpinning, setReelSpinning] = useState<boolean>(false);
+  const [showAnticipationGlow, setShowAnticipationGlow] = useState<boolean>(false);
   const controls = useAnimation();
   const stopTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const antTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const rowsCount = currentSymbols.length || 3;
   const spinningMultiplier = 5;
@@ -85,9 +89,14 @@ export const SlotReel: React.FC<SlotReelProps> = ({
       clearTimeout(stopTimerRef.current);
       stopTimerRef.current = null;
     }
+    if (antTimerRef.current) {
+      clearTimeout(antTimerRef.current);
+      antTimerRef.current = null;
+    }
 
     if (isSpinning) {
       setReelSpinning(true);
+      setShowAnticipationGlow(false);
       controls.start({
         y: ["0%", "-80%"],
         transition: {
@@ -100,10 +109,17 @@ export const SlotReel: React.FC<SlotReelProps> = ({
         }
       });
     } else {
+      if (isAnticipating) {
+        antTimerRef.current = setTimeout(() => {
+          setShowAnticipationGlow(true);
+        }, Math.max(0, anticipationStartDelay));
+      }
+
       stopTimerRef.current = setTimeout(() => {
         controls.stop();
         setCurrentSymbols(resultSymbols);
         setReelSpinning(false);
+        setShowAnticipationGlow(false);
         controls.set({ y: -12 });
         controls.start({
           y: 0,
@@ -117,8 +133,12 @@ export const SlotReel: React.FC<SlotReelProps> = ({
         clearTimeout(stopTimerRef.current);
         stopTimerRef.current = null;
       }
+      if (antTimerRef.current) {
+        clearTimeout(antTimerRef.current);
+        antTimerRef.current = null;
+      }
     };
-  }, [isSpinning, resultSymbols, delay, controls]);
+  }, [isSpinning, resultSymbols, delay, anticipationStartDelay, isAnticipating, controls]);
 
   const spinPool = activeSymbols.length > 0 ? activeSymbols : ALL_SYMBOLS;
   const spinningColumn = Array.from({ length: totalSpinningItems }).map((_, i) => {
@@ -147,7 +167,7 @@ export const SlotReel: React.FC<SlotReelProps> = ({
         ? 'bg-transparent border-none shadow-none' 
         : 'bg-black/75 rounded-xl border-x border-[#4d3d00]/60 shadow-[inset_0_0_20px_rgba(0,0,0,0.9)]'
     } ${
-      isAnticipating && reelSpinning
+      isAnticipating && reelSpinning && showAnticipationGlow
         ? `${antStyle.ring} ${antStyle.shadow} z-30 animate-pulse scale-[1.03]`
         : ''
     }`}>
@@ -161,7 +181,7 @@ export const SlotReel: React.FC<SlotReelProps> = ({
       )}
 
       {/* Anticipation Glow Overlay */}
-      {isAnticipating && reelSpinning && (
+      {isAnticipating && reelSpinning && showAnticipationGlow && (
         <div className={`absolute inset-0 ${antStyle.textGlow} pointer-events-none z-20 animate-pulse`} />
       )}
 
