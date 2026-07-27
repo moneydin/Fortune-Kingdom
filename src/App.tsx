@@ -170,6 +170,10 @@ export default function App() {
   const [isCriadorDesignerOpen, setIsCriadorDesignerOpen] = useState<boolean>(false);
   const [bonusFinalWin, setBonusFinalWin] = useState<number | null>(null);
   const [isBuyBonusConfirmOpen, setIsBuyBonusConfirmOpen] = useState<boolean>(false);
+  const [pendingBonusAward, setPendingBonusAward] = useState<{
+    spinsCount: number;
+    instantPayout: number;
+  } | null>(null);
 
   // States for Full Screen (Tela Cheia) Celebration Overlay
   const [fullScreenCelebration, setFullScreenCelebration] = useState<{
@@ -227,7 +231,15 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Keep player bet within safety boundaries when min/max limits change
+  const handleStartBonusSpins = (spinsCount: number, instantPayout: number) => {
+    setPendingBonusAward(null);
+    setGameState(prev => ({
+      ...prev,
+      inBonusRound: true,
+      bonusSpinsRemaining: spinsCount,
+      bonusTotalWin: instantPayout,
+    }));
+  };
   useEffect(() => {
     if (gameState.bet < adminConfig.minBet) {
       setGameState(prev => ({ ...prev, bet: adminConfig.minBet }));
@@ -444,7 +456,10 @@ export default function App() {
       });
     }
 
-    // Determine anticipation condition: cash cards missing 1 to trigger win, or bonus cards 1 away from trigger
+    // Determine anticipation condition:
+    // 1) Cash cards missing 1 to trigger win
+    // 2) Bonus cards missing 1 to trigger free spins
+    // 3) Full screen potential missing 1 column to complete full board
     const cols = dims.cols;
     const minCashReq = adminConfig.minCashCardsForWin ?? 5;
     const minBonusReq = adminConfig.bonusMinCardsCount ?? 3;
@@ -461,9 +476,30 @@ export default function App() {
       }
     }
 
+    let isFullScreenPotential = cols >= 3;
+    if (isFullScreenPotential) {
+      let candidateSym: string | null = null;
+      for (let c = 0; c < cols - 1; c++) {
+        for (let r = 0; r < dims.rows; r++) {
+          const sym = resultGrid[c][r];
+          if (sym === 'cash') { isFullScreenPotential = false; break; }
+          if (sym !== 'wild') {
+            if (!candidateSym) {
+              candidateSym = sym;
+            } else if (candidateSym !== sym) {
+              isFullScreenPotential = false;
+              break;
+            }
+          }
+        }
+        if (!isFullScreenPotential) break;
+      }
+    }
+
     const isAnticipating = cols >= 3 && (
-      (cashCountBeforeLast >= minCashReq - 1 && minCashReq > 1) ||
-      (bonusCountBeforeLast >= minBonusReq - 1 && minBonusReq > 1)
+      (cashCountBeforeLast >= minCashReq - 1 && minCashReq > 1 && cashCountBeforeLast < minCashReq) ||
+      (bonusCountBeforeLast >= minBonusReq - 1 && minBonusReq > 1 && bonusCountBeforeLast < minBonusReq) ||
+      isFullScreenPotential
     );
     setHasAnticipation(isAnticipating);
 
@@ -526,13 +562,20 @@ export default function App() {
       setGameState(prev => {
         const nextBonusTotalWin = isBonusSpin ? (prev.bonusTotalWin ?? 0) + payout : prev.bonusTotalWin;
         const entersBonusNow = !isBonusSpin && evaluation.isBonusTriggered;
+        
+        if (entersBonusNow) {
+          setPendingBonusAward({
+            spinsCount: adminConfig.bonusFreeSpinsCount ?? 10,
+            instantPayout: payout,
+          });
+          setGameSettings(s => ({ ...s, isAutoSpinning: false, autoSpinCount: 0 }));
+        }
+
         const stillInBonus = isBonusSpin 
           ? (prev.bonusSpinsRemaining ?? 1) - 1 > 0 
-          : (prev.inBonusRound || entersBonusNow);
+          : prev.inBonusRound;
         
-        const nextSpinsRemaining = entersBonusNow
-          ? (adminConfig.bonusFreeSpinsCount ?? 10)
-          : isBonusSpin
+        const nextSpinsRemaining = isBonusSpin
           ? Math.max(0, (prev.bonusSpinsRemaining ?? 1) - 1)
           : prev.bonusSpinsRemaining;
 
@@ -547,7 +590,7 @@ export default function App() {
           balance: prev.balance + payout,
           bigWin: payout >= currentBet * 15,
           progression: Math.min(100, prev.progression + (hasWins ? 2.5 : 0.5)),
-          bonusTotalWin: entersBonusNow ? payout : nextBonusTotalWin,
+          bonusTotalWin: isBonusSpin ? nextBonusTotalWin : prev.bonusTotalWin,
           inBonusRound: stillInBonus,
           bonusSpinsRemaining: nextSpinsRemaining,
         };
@@ -1336,6 +1379,80 @@ export default function App() {
             )}
           </div>
         </div>
+
+        {/* BONUS AWARDED INTRO POPUP MODAL */}
+        {pendingBonusAward !== null && (
+          <div className="absolute inset-0 bg-black/90 backdrop-blur-md z-50 flex flex-col items-center justify-center p-4 text-center animate-in zoom-in duration-300 pointer-events-auto overflow-hidden">
+            {adminConfig.bonusMediaUrl && (
+              <div className="absolute inset-0 w-full h-full z-0 opacity-40 pointer-events-none">
+                {getYouTubeEmbedUrl(adminConfig.bonusMediaUrl) ? (
+                  <iframe
+                    src={getYouTubeEmbedUrl(adminConfig.bonusMediaUrl)!}
+                    title="Bonus Celebration"
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; loop"
+                    className="absolute inset-0 w-full h-full object-cover opacity-100 pointer-events-none scale-110"
+                    style={{ width: '100%', height: '100%', border: 'none' }}
+                  />
+                ) : (
+                  adminConfig.bonusMediaUrl.match(/\.(mp4|webm|ogg|mov)/i) || adminConfig.bonusMediaUrl.includes('video') ? (
+                    <video
+                      src={adminConfig.bonusMediaUrl}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="absolute inset-0 w-full h-full object-cover opacity-100 pointer-events-none"
+                    />
+                  ) : (
+                    <img
+                      src={adminConfig.bonusMediaUrl}
+                      alt="Bonus background"
+                      className="absolute inset-0 w-full h-full object-cover opacity-100 pointer-events-none"
+                      referrerPolicy="no-referrer"
+                    />
+                  )
+                )}
+                <div className="absolute inset-0 bg-black/40" />
+              </div>
+            )}
+
+            <div className="relative z-10 max-w-sm w-full bg-gradient-to-b from-[#2a1a00]/95 via-[#150d00]/95 to-[#0a0500]/95 backdrop-blur-xl border-2 border-yellow-400 p-6 rounded-3xl shadow-[0_0_60px_rgba(251,191,36,0.6)] text-center flex flex-col items-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-yellow-500 to-amber-300 p-0.5 shadow-[0_0_25px_rgba(245,158,11,0.8)] animate-bounce flex items-center justify-center">
+                <Sparkles className="w-10 h-10 text-black fill-black" />
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-xs font-black text-amber-400 uppercase tracking-widest block">
+                  🎉 BÔNUS DESBLOQUEADO! 🎉
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight drop-shadow-[0_2px_10px_rgba(251,191,36,0.8)]">
+                  VOCÊ GANHOU
+                </h2>
+                <div className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-200 to-yellow-400 font-mono py-1">
+                  {pendingBonusAward.spinsCount}
+                </div>
+                <span className="text-sm font-extrabold text-amber-200 uppercase tracking-wider block">
+                  RODADAS GRÁTIS
+                </span>
+              </div>
+
+              {pendingBonusAward.instantPayout > 0 && (
+                <div className="bg-yellow-500/10 border border-yellow-500/30 px-3 py-1.5 rounded-xl text-xs font-bold text-yellow-300">
+                  Prêmio de Ativação: +R$ {pendingBonusAward.instantPayout.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </div>
+              )}
+
+              <button
+                onClick={() => handleStartBonusSpins(pendingBonusAward.spinsCount, pendingBonusAward.instantPayout)}
+                className="w-full py-3.5 bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-500 hover:from-yellow-300 hover:to-amber-400 text-black font-black text-sm uppercase tracking-wider rounded-2xl shadow-[0_0_25px_rgba(251,191,36,0.8)] hover:scale-105 active:scale-95 transition cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Play className="w-5 h-5 fill-black" />
+                <span>INICIAR RODADAS GRÁTIS</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* BONUS COMPLETED POPUP MODAL OVERLAY */}
         {bonusFinalWin !== null && (

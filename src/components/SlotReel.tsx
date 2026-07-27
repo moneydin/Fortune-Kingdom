@@ -160,16 +160,9 @@ export const SlotReel: React.FC<SlotReelProps> = ({
         </>
       )}
 
-      {/* Anticipation Glow and Badge Overlays */}
+      {/* Anticipation Glow Overlay */}
       {isAnticipating && reelSpinning && (
-        <>
-          <div className={`absolute inset-0 ${antStyle.textGlow} pointer-events-none z-20 animate-pulse`} />
-          <div className={`absolute top-1.5 left-1/2 -translate-x-1/2 bg-gradient-to-r ${antStyle.badgeBg} font-black text-[9px] px-2 py-0.5 rounded-full shadow-xl z-20 animate-bounce tracking-widest whitespace-nowrap uppercase flex items-center gap-1`}>
-            <span>⚡</span>
-            <span>AMEAÇA</span>
-            <span>⚡</span>
-          </div>
-        </>
+        <div className={`absolute inset-0 ${antStyle.textGlow} pointer-events-none z-20 animate-pulse`} />
       )}
 
       <motion.div 
