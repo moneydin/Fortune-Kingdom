@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Menu, ShieldAlert, Volume2, VolumeX, Plus, Minus, Trophy, Coins, Play, Square, Settings2, Zap } from 'lucide-react';
+import { Menu, ShieldAlert, Volume2, VolumeX, Plus, Minus, Trophy, Coins, Play, Square, Settings2, Zap, Smartphone, Monitor, Tablet, ZoomIn, ZoomOut, Sparkles } from 'lucide-react';
 import { SlotMachine } from './components/SlotMachine';
 import { SpinButton } from './components/SpinButton';
 import { GameMenuModal } from './components/GameMenuModal';
 import { AdminPanelModal } from './components/AdminPanelModal';
+import { CriadorDesignerModal } from './components/CriadorDesignerModal';
 import { BackgroundMedia } from './components/BackgroundMedia';
 import { CounterUpAnimation } from './components/CounterUpAnimation';
 import { motion } from 'motion/react';
@@ -126,6 +127,8 @@ function saveAdminConfig(config: AdminConfig) {
 
 export default function App() {
   const [adminConfig, setAdminConfig] = useState<AdminConfig>(() => loadAdminConfig());
+  const [pcViewportMode, setPcViewportMode] = useState<'mobile' | 'pc' | 'tablet'>('mobile');
+  const [pcZoomScale, setPcZoomScale] = useState<number>(100);
 
   const [gameState, setGameState] = useState<GameState>(() => {
     const initialConfig = loadAdminConfig();
@@ -159,9 +162,12 @@ export default function App() {
     gameSettingsRef.current = gameSettings;
   }, [gameSettings]);
 
+  const isSpinningLockRef = useRef<boolean>(false);
+
   const [spinHistory, setSpinHistory] = useState<SpinHistoryItem[]>([]);
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [isAdminOpen, setIsAdminOpen] = useState<boolean>(false);
+  const [isCriadorDesignerOpen, setIsCriadorDesignerOpen] = useState<boolean>(false);
   const [bonusFinalWin, setBonusFinalWin] = useState<number | null>(null);
   const [isBuyBonusConfirmOpen, setIsBuyBonusConfirmOpen] = useState<boolean>(false);
 
@@ -272,7 +278,8 @@ export default function App() {
   };
 
   const handleSpin = () => {
-    if (gameState.isSpinning) return;
+    if (gameState.isSpinning || isSpinningLockRef.current) return;
+    isSpinningLockRef.current = true;
 
     const isBonusSpin = !!gameState.inBonusRound && (gameState.bonusSpinsRemaining ?? 0) > 0;
     const currentBet = gameState.bet;
@@ -280,6 +287,7 @@ export default function App() {
 
     if (!isBonusSpin && gameState.balance < currentBet) {
       alert('Saldo insuficiente para girar!');
+      isSpinningLockRef.current = false;
       return;
     }
 
@@ -301,6 +309,14 @@ export default function App() {
       };
     });
 
+    const evalOpts = {
+      minCashCardsForWin: adminConfig.minCashCardsForWin ?? 5,
+      cashCardSinglePay: adminConfig.cashCardSinglePay ?? false,
+      bonusTriggerSymbolId: adminConfig.bonusTriggerSymbolId || 'crown',
+      bonusMinCardsCount: adminConfig.bonusMinCardsCount ?? 3,
+      bonusInstantPayMultiplier: adminConfig.bonusInstantPayMultiplier ?? 5,
+    };
+
     // Generate outcome using the dynamic Slot Engine
     const dims = getBoardDimensions(engineConfig.boardType);
     let resultCashGrid = Array(dims.cols).fill(null).map(() => 
@@ -308,7 +324,7 @@ export default function App() {
     );
 
     let resultGrid = generateBoardGrid(engineConfig.boardType, engineConfig.symbols);
-    let evaluation = evaluateBoardWins(resultGrid, engineConfig.boardType, engineConfig.symbols, engineConfig.paylines, currentBet, resultCashGrid);
+    let evaluation = evaluateBoardWins(resultGrid, engineConfig.boardType, engineConfig.symbols, engineConfig.paylines, currentBet, resultCashGrid, evalOpts);
 
     // Determine what forced outcome to use
     let forced = adminConfig.forcedOutcome;
@@ -317,13 +333,37 @@ export default function App() {
     }
 
     // Realistic math-based cheat mechanism
-    if (forced === 'full_screen') {
+    if (forced === 'bonus' as any) {
+      const { cols, rows } = getBoardDimensions(engineConfig.boardType);
+      resultGrid = generateBoardGrid(engineConfig.boardType, engineConfig.symbols);
+      const targetBonusSym = adminConfig.bonusTriggerSymbolId || 'crown';
+      const minReqBonus = adminConfig.bonusMinCardsCount ?? 3;
+      
+      const allCoords: { col: number; row: number }[] = [];
+      for (let c = 0; c < cols; c++) {
+        for (let r = 0; r < rows; r++) {
+          allCoords.push({ col: c, row: r });
+        }
+      }
+      for (let i = allCoords.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const temp = allCoords[i];
+        allCoords[i] = allCoords[j];
+        allCoords[j] = temp;
+      }
+      const countToPlace = Math.min(allCoords.length, minReqBonus);
+      for (let i = 0; i < countToPlace; i++) {
+        const coord = allCoords[i];
+        resultGrid[coord.col][coord.row] = targetBonusSym;
+      }
+      evaluation = evaluateBoardWins(resultGrid, engineConfig.boardType, engineConfig.symbols, engineConfig.paylines, currentBet, resultCashGrid, evalOpts);
+    } else if (forced === 'full_screen') {
       const activeSymbolsWithFs = engineConfig.symbols.filter(s => s.isActive && s.fullScreenMultiplier && s.fullScreenMultiplier > 0);
       if (activeSymbolsWithFs.length > 0) {
         const chosenSym = activeSymbolsWithFs[Math.floor(Math.random() * activeSymbolsWithFs.length)];
         const { cols, rows } = getBoardDimensions(engineConfig.boardType);
         resultGrid = Array(cols).fill(null).map(() => Array(rows).fill(chosenSym.id));
-        evaluation = evaluateBoardWins(resultGrid, engineConfig.boardType, engineConfig.symbols, engineConfig.paylines, currentBet, resultCashGrid);
+        evaluation = evaluateBoardWins(resultGrid, engineConfig.boardType, engineConfig.symbols, engineConfig.paylines, currentBet, resultCashGrid, evalOpts);
       }
     } else if (forced === 'big_win') {
       let attempts = 0;
@@ -332,7 +372,7 @@ export default function App() {
         resultCashGrid = Array(dims.cols).fill(null).map(() => 
           Array(dims.rows).fill(null).map(() => getRandomCashMultiplier(adminConfig.customCashMultipliers))
         );
-        evaluation = evaluateBoardWins(resultGrid, engineConfig.boardType, engineConfig.symbols, engineConfig.paylines, currentBet, resultCashGrid);
+        evaluation = evaluateBoardWins(resultGrid, engineConfig.boardType, engineConfig.symbols, engineConfig.paylines, currentBet, resultCashGrid, evalOpts);
         attempts++;
       }
     } else if (forced === 'normal_win') {
@@ -342,7 +382,7 @@ export default function App() {
         resultCashGrid = Array(dims.cols).fill(null).map(() => 
           Array(dims.rows).fill(null).map(() => getRandomCashMultiplier(adminConfig.customCashMultipliers))
         );
-        evaluation = evaluateBoardWins(resultGrid, engineConfig.boardType, engineConfig.symbols, engineConfig.paylines, currentBet, resultCashGrid);
+        evaluation = evaluateBoardWins(resultGrid, engineConfig.boardType, engineConfig.symbols, engineConfig.paylines, currentBet, resultCashGrid, evalOpts);
         attempts++;
       }
     } else if (forced === 'loss') {
@@ -352,7 +392,7 @@ export default function App() {
         resultCashGrid = Array(dims.cols).fill(null).map(() => 
           Array(dims.rows).fill(null).map(() => getRandomCashMultiplier(adminConfig.customCashMultipliers))
         );
-        evaluation = evaluateBoardWins(resultGrid, engineConfig.boardType, engineConfig.symbols, engineConfig.paylines, currentBet, resultCashGrid);
+        evaluation = evaluateBoardWins(resultGrid, engineConfig.boardType, engineConfig.symbols, engineConfig.paylines, currentBet, resultCashGrid, evalOpts);
         attempts++;
       }
     } else if (forced === 'force_cash_collect') {
@@ -373,7 +413,8 @@ export default function App() {
         allCoords[j] = temp;
       }
       
-      for (let i = 0; i < 5; i++) {
+      const forcedCashCardsCount = Math.min(allCoords.length, adminConfig.minCashCardsForWin ?? 5);
+      for (let i = 0; i < forcedCashCardsCount; i++) {
         const coord = allCoords[i];
         resultGrid[coord.col][coord.row] = 'cash';
       }
@@ -391,7 +432,7 @@ export default function App() {
       resultCashGrid = Array(cols).fill(null).map(() => 
         Array(rows).fill(null).map(() => getRandomCashMultiplier(adminConfig.customCashMultipliers))
       );
-      evaluation = evaluateBoardWins(resultGrid, engineConfig.boardType, engineConfig.symbols, engineConfig.paylines, currentBet, resultCashGrid);
+      evaluation = evaluateBoardWins(resultGrid, engineConfig.boardType, engineConfig.symbols, engineConfig.paylines, currentBet, resultCashGrid, evalOpts);
     }
 
     // Reset cheat trigger if it was a manual forced outcome (non-bonus)
@@ -403,27 +444,41 @@ export default function App() {
       });
     }
 
-    // Determine anticipation condition: high special symbols in columns 0..N-2
+    // Determine anticipation condition: cash cards missing 1 to trigger win, or bonus cards 1 away from trigger
     const cols = dims.cols;
-    let isAnticipating = false;
-    if (cols >= 3) {
-      let specialSymbolCount = 0;
-      for (let c = 0; c < cols - 1; c++) {
-        specialSymbolCount += resultGrid[c].filter(sym => sym === 'cash' || sym === 'wild' || sym === 'Dragon' || sym === 'Crown').length;
-      }
-      if (specialSymbolCount >= 3) {
-        isAnticipating = true;
+    const minCashReq = adminConfig.minCashCardsForWin ?? 5;
+    const minBonusReq = adminConfig.bonusMinCardsCount ?? 3;
+    const bonusTargetSym = adminConfig.bonusTriggerSymbolId || 'crown';
+
+    let cashCountBeforeLast = 0;
+    let bonusCountBeforeLast = 0;
+
+    for (let c = 0; c < cols - 1; c++) {
+      for (let r = 0; r < dims.rows; r++) {
+        const sym = resultGrid[c][r];
+        if (sym === 'cash') cashCountBeforeLast++;
+        if (sym === bonusTargetSym) bonusCountBeforeLast++;
       }
     }
+
+    const isAnticipating = cols >= 3 && (
+      (cashCountBeforeLast >= minCashReq - 1 && minCashReq > 1) ||
+      (bonusCountBeforeLast >= minBonusReq - 1 && minBonusReq > 1)
+    );
     setHasAnticipation(isAnticipating);
 
     // Load actual grid state
     setGrid(resultGrid);
     setCashGrid(resultCashGrid);
 
-    const spinDuration = gameSettings.turboMode ? 600 : 1500;
-    const isAnticipatingNow = isAnticipating && !gameSettings.turboMode;
-    const stopPresentationDelay = isAnticipatingNow ? 2000 : 0;
+    const isTurbo = gameSettingsRef.current.turboMode;
+    const normalSpeed = adminConfig.spinSpeedNormal ?? 1200;
+    const turboSpeed = adminConfig.spinSpeedTurbo ?? 350;
+    const baseSpeed = isTurbo ? turboSpeed : normalSpeed;
+    const stagger = isTurbo ? Math.max(30, Math.floor((adminConfig.reelStaggerDelay ?? 120) / 3)) : (adminConfig.reelStaggerDelay ?? 120);
+    const anticipationExtra = isAnticipating && !isTurbo ? 1800 : 0;
+    const spinDuration = baseSpeed;
+    const totalPresentationDelay = baseSpeed + (cols - 1) * stagger + anticipationExtra + 100;
 
     // Trigger sequential reels stagger stop
     setTimeout(() => {
@@ -470,8 +525,17 @@ export default function App() {
 
       setGameState(prev => {
         const nextBonusTotalWin = isBonusSpin ? (prev.bonusTotalWin ?? 0) + payout : prev.bonusTotalWin;
-        const stillInBonus = isBonusSpin ? (prev.bonusSpinsRemaining ?? 1) - 1 > 0 : prev.inBonusRound;
+        const entersBonusNow = !isBonusSpin && evaluation.isBonusTriggered;
+        const stillInBonus = isBonusSpin 
+          ? (prev.bonusSpinsRemaining ?? 1) - 1 > 0 
+          : (prev.inBonusRound || entersBonusNow);
         
+        const nextSpinsRemaining = entersBonusNow
+          ? (adminConfig.bonusFreeSpinsCount ?? 10)
+          : isBonusSpin
+          ? Math.max(0, (prev.bonusSpinsRemaining ?? 1) - 1)
+          : prev.bonusSpinsRemaining;
+
         if (isBonusSpin && !stillInBonus) {
           setBonusFinalWin(nextBonusTotalWin);
         }
@@ -483,10 +547,13 @@ export default function App() {
           balance: prev.balance + payout,
           bigWin: payout >= currentBet * 15,
           progression: Math.min(100, prev.progression + (hasWins ? 2.5 : 0.5)),
-          bonusTotalWin: nextBonusTotalWin,
+          bonusTotalWin: entersBonusNow ? payout : nextBonusTotalWin,
           inBonusRound: stillInBonus,
+          bonusSpinsRemaining: nextSpinsRemaining,
         };
       });
+
+      isSpinningLockRef.current = false;
 
       // Update casino math records and persist to localStorage
       setAdminConfig(prev => {
@@ -603,8 +670,40 @@ export default function App() {
   };
 
   const handleCustomButtonAction = (btn: CustomButtonConfig) => {
-    if (gameState.isSpinning) return;
+    if (gameState.isSpinning && btn.actionType !== 'turbo_toggle') return;
     switch (btn.actionType) {
+      case 'spin': {
+        handleSpin();
+        break;
+      }
+      case 'buy_bonus': {
+        handleBuyBonusClick();
+        break;
+      }
+      case 'bet_plus': {
+        handleBetChange(1);
+        break;
+      }
+      case 'bet_minus': {
+        handleBetChange(-1);
+        break;
+      }
+      case 'turbo_toggle': {
+        setGameSettings(prev => ({ ...prev, turboMode: !prev.turboMode }));
+        break;
+      }
+      case 'auto_spin': {
+        if (gameSettings.isAutoSpinning) {
+          setGameSettings(prev => ({ ...prev, isAutoSpinning: false, autoSpinCount: 0 }));
+        } else {
+          setGameSettings(prev => ({ ...prev, isAutoSpinning: true, autoSpinCount: 10 }));
+        }
+        break;
+      }
+      case 'open_menu': {
+        setIsMenuOpen(true);
+        break;
+      }
       case 'add_balance': {
         const amt = parseFloat(btn.actionValue) || 1000;
         setGameState(prev => ({ ...prev, balance: prev.balance + amt }));
@@ -666,7 +765,7 @@ export default function App() {
       }, delay);
       return () => clearTimeout(timer);
     }
-  }, [gameSettings.isAutoSpinning, gameState.isSpinning, gameState.balance, fullScreenCelebration]);
+  }, [gameSettings.isAutoSpinning, gameSettings.turboMode, gameState.isSpinning, gameState.balance, fullScreenCelebration]);
 
   // Sequential win presentation effect
   useEffect(() => {
@@ -710,11 +809,96 @@ export default function App() {
     : winningLines.flatMap(line => line.coordinates);
 
   return (
-    <div className="relative w-full h-screen h-[100dvh] bg-[#0a0b12] font-sans text-white flex items-center justify-center overflow-hidden touch-none select-none p-0 sm:p-4">
+    <div className="relative w-full h-screen h-[100dvh] bg-[#06070a] font-sans text-white flex items-center justify-center overflow-hidden touch-none select-none p-0 sm:p-4">
       
-      {/* Game Stage - Mobile-first portrait layout (9:16) for absolute placement precision */}
+      {/* PC Floating Viewport Control Bar (Desktop Only) */}
+      <div className="hidden lg:flex fixed top-3 left-1/2 -translate-x-1/2 z-50 items-center gap-2 bg-black/85 backdrop-blur-md px-3 py-1.5 rounded-full border border-red-500/40 shadow-[0_0_25px_rgba(0,0,0,0.8)]">
+        <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest mr-1">
+          Modo PC:
+        </span>
+
+        <div className="flex items-center gap-1 bg-white/5 p-1 rounded-full border border-white/10">
+          <button
+            type="button"
+            onClick={() => setPcViewportMode('mobile')}
+            className={`px-2.5 py-1 rounded-full text-[10px] font-black transition flex items-center gap-1 cursor-pointer ${pcViewportMode === 'mobile' ? 'bg-red-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+            title="Moldura Celular (9:16)"
+          >
+            <Smartphone className="w-3 h-3" />
+            <span>Celular 9:16</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setPcViewportMode('pc')}
+            className={`px-2.5 py-1 rounded-full text-[10px] font-black transition flex items-center gap-1 cursor-pointer ${pcViewportMode === 'pc' ? 'bg-red-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+            title="Desktop Tela Cheia (16:9)"
+          >
+            <Monitor className="w-3 h-3" />
+            <span>PC Widescreen</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setPcViewportMode('tablet')}
+            className={`px-2.5 py-1 rounded-full text-[10px] font-black transition flex items-center gap-1 cursor-pointer ${pcViewportMode === 'tablet' ? 'bg-red-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+            title="Proporção Tablet (4:3)"
+          >
+            <Tablet className="w-3 h-3" />
+            <span>Tablet 4:3</span>
+          </button>
+        </div>
+
+        <div className="h-4 w-[1px] bg-white/10 mx-0.5" />
+
+        {/* Criador Designer Open Button */}
+        <button
+          type="button"
+          onClick={() => setIsCriadorDesignerOpen(true)}
+          className="px-3 py-1 bg-gradient-to-r from-red-600 via-amber-500 to-yellow-400 text-black font-black text-[10px] rounded-full shadow-[0_0_15px_rgba(250,204,21,0.6)] hover:scale-105 transition flex items-center gap-1.5 cursor-pointer uppercase tracking-wider"
+          title="Abrir Estúdio Criador Designer para PC"
+        >
+          <Sparkles className="w-3.5 h-3.5 fill-black" />
+          <span>Criador Designer</span>
+        </button>
+
+        <div className="h-4 w-[1px] bg-white/10 mx-0.5" />
+
+        {/* Zoom adjustment for PC */}
+        <div className="flex items-center gap-1 bg-black/60 px-2 py-0.5 rounded-full border border-white/10">
+          <button
+            type="button"
+            onClick={() => setPcZoomScale(Math.max(80, pcZoomScale - 5))}
+            className="p-1 hover:text-white text-gray-400 cursor-pointer"
+            title="Diminuir Zoom"
+          >
+            <ZoomOut className="w-3 h-3" />
+          </button>
+          <span className="text-[10px] font-mono font-bold text-amber-300 w-8 text-center">{pcZoomScale}%</span>
+          <button
+            type="button"
+            onClick={() => setPcZoomScale(Math.min(130, pcZoomScale + 5))}
+            className="p-1 hover:text-white text-gray-400 cursor-pointer"
+            title="Aumentar Zoom"
+          >
+            <ZoomIn className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+
+      {/* Game Stage Container */}
       <div 
-        className="relative w-full max-w-[min(100vw,calc(100vh*9/16))] h-full max-h-[min(100dvh,calc(100vw*16/9))] sm:max-h-[840px] aspect-[9/16] bg-[#050914] sm:rounded-[36px] sm:border-[10px] sm:border-neutral-800 shadow-[0_20px_50px_rgba(0,0,0,0.9)] overflow-hidden flex items-center justify-center transition-all duration-100"
+        style={{
+          transform: pcZoomScale !== 100 ? `scale(${pcZoomScale / 100})` : undefined,
+          transformOrigin: 'center center',
+        }}
+        className={`relative w-full h-full bg-[#050914] overflow-hidden flex items-center justify-center transition-all duration-300 ${
+          pcViewportMode === 'pc'
+            ? 'max-w-full max-h-full rounded-none border-0 shadow-none'
+            : pcViewportMode === 'tablet'
+            ? 'max-w-[min(100vw,calc(100vh*3/4))] max-h-[min(100dvh,calc(100vw*4/3))] sm:max-h-[840px] aspect-[3/4] sm:rounded-[28px] sm:border-[8px] sm:border-neutral-800 shadow-[0_20px_60px_rgba(0,0,0,0.9)]'
+            : 'max-w-[min(100vw,calc(100vh*9/16))] max-h-[min(100dvh,calc(100vw*16/9))] sm:max-h-[840px] aspect-[9/16] sm:rounded-[36px] sm:border-[10px] sm:border-neutral-800 shadow-[0_20px_60px_rgba(0,0,0,0.9)]'
+        }`}
       >
         {/* Background Media Layer (Image or Infinite Loop Video) */}
         <BackgroundMedia 
@@ -851,10 +1035,11 @@ export default function App() {
             left: `${adminConfig.slotLeft ?? 30}%`,
             width: `${adminConfig.slotWidth ?? 40}%`,
             height: `${adminConfig.slotHeight ?? 40}%`,
-            borderColor: adminConfig.slotFrameColor ?? '#ffb700',
-            borderWidth: `${adminConfig.slotFrameBorderWidth ?? 4}px`,
-            backgroundColor: adminConfig.slotFrameBgColor ?? 'rgba(0,0,0,0.65)',
-            borderStyle: (adminConfig.slotFrameBorderWidth ?? 4) > 0 ? 'solid' : 'none',
+            borderColor: adminConfig.slotHideOuterFrame ? 'transparent' : (adminConfig.slotFrameColor ?? '#ffb700'),
+            borderWidth: adminConfig.slotHideOuterFrame ? '0px' : `${adminConfig.slotFrameBorderWidth ?? 4}px`,
+            backgroundColor: adminConfig.slotHideOuterFrame ? 'transparent' : (adminConfig.slotFrameBgColor ?? 'rgba(0,0,0,0.65)'),
+            borderStyle: adminConfig.slotHideOuterFrame ? 'none' : ((adminConfig.slotFrameBorderWidth ?? 4) > 0 ? 'solid' : 'none'),
+            boxShadow: adminConfig.slotHideOuterFrame ? 'none' : undefined,
           }}
           className="absolute flex items-center justify-center z-10 transition-all duration-100 rounded-2xl shadow-[0_10px_35px_rgba(0,0,0,0.8)] overflow-hidden"
         >
@@ -869,6 +1054,10 @@ export default function App() {
             cashGrid={cashGrid}
             bet={gameState.bet}
             hasAnticipation={hasAnticipation}
+            slotHideGrid={adminConfig.slotHideGrid ?? false}
+            staggerDelay={gameSettings.turboMode ? Math.max(30, Math.floor((adminConfig.reelStaggerDelay ?? 120) / 3)) : (adminConfig.reelStaggerDelay ?? 120)}
+            anticipationExtraDelay={gameSettings.turboMode ? 800 : 1800}
+            cashAnticipationColor={adminConfig.cashAnticipationColor ?? 'gold'}
           />
         </div>
 
@@ -894,7 +1083,7 @@ export default function App() {
           <button
             key={btn.id}
             onClick={() => handleCustomButtonAction(btn)}
-            disabled={gameState.isSpinning}
+            disabled={gameState.isSpinning && btn.actionType !== 'turbo_toggle' && btn.actionType !== 'auto_spin'}
             style={{
               position: 'absolute',
               top: `${btn.posY}%`,
@@ -905,6 +1094,24 @@ export default function App() {
           >
             {btn.label}
           </button>
+        ))}
+
+        {/* ACTIVE CUSTOM TEXTS ON THE SCREEN */}
+        {adminConfig.customTexts?.filter(txt => txt.isActive).map(txt => (
+          <div
+            key={txt.id}
+            style={{
+              position: 'absolute',
+              top: `${txt.posY}%`,
+              left: `${txt.posX}%`,
+              transform: 'translate(-50%, -50%)',
+              fontSize: `${txt.fontSize}px`,
+              color: txt.color,
+            }}
+            className="z-20 font-extrabold shadow-sm select-none whitespace-nowrap pointer-events-none"
+          >
+            {txt.text}
+          </div>
         ))}
         
         {/* Spin Button Area - Positioned according to Admin Configuration */}
@@ -1308,6 +1515,10 @@ export default function App() {
           setEngineConfig(newConfig);
           saveEngineConfig(newConfig);
         }}
+        onOpenCriadorDesigner={() => {
+          setIsAdminOpen(false);
+          setIsCriadorDesignerOpen(true);
+        }}
       />
 
       {/* FULL SCREEN (TELA CHEIA) CELEBRATION OVERLAY */}
@@ -1419,6 +1630,23 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Criador Designer Modal */}
+      <CriadorDesignerModal 
+        isOpen={isCriadorDesignerOpen}
+        onClose={() => setIsCriadorDesignerOpen(false)}
+        adminConfig={adminConfig}
+        onUpdateAdminConfig={(updates) => {
+          setAdminConfig(prev => {
+            const updated = { ...prev, ...updates };
+            saveAdminConfig(updated);
+            return updated;
+          });
+        }}
+        gameState={gameState}
+        onSpin={handleSpin}
+        onUpdateGameState={(updates) => setGameState(prev => ({ ...prev, ...updates }))}
+      />
 
     </div>
   );

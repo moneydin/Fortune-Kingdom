@@ -2,7 +2,8 @@ import React, { useState, useRef } from 'react';
 import { 
   Shield, X, DollarSign, Activity, Percent, Flame, RefreshCw, Key, 
   AlertTriangle, Image as ImageIcon, Move, LayoutGrid, Upload, Trash2, 
-  RotateCcw, Sliders, Eye, Settings, Plus
+  RotateCcw, Sliders, Eye, Settings, Plus, Grid, Crosshair, Smartphone,
+  Monitor, ZoomIn, ZoomOut, Maximize2, Sparkles
 } from 'lucide-react';
 import { AdminConfig, GameState, SymbolType } from '../types';
 import { SlotSymbol } from './SlotSymbol';
@@ -21,6 +22,7 @@ interface AdminPanelModalProps {
   onResetStats: () => void;
   engineConfig: SlotEngineConfig;
   onUpdateEngineConfig: (newConfig: SlotEngineConfig) => void;
+  onOpenCriadorDesigner?: () => void;
 }
 
 const SYMBOL_NAMES: { type: SymbolType; label: string }[] = [
@@ -36,6 +38,118 @@ const SYMBOL_NAMES: { type: SymbolType; label: string }[] = [
   { type: 'Coin', label: 'Moeda de Ouro' },
 ];
 
+// Helper Component for Ultra High-Precision Numeric & Step Adjustment on PC & Mobile
+const PrecisionControl: React.FC<{
+  label: string;
+  value: number;
+  onChange: (val: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  unit?: string;
+  colorClass?: string;
+}> = ({ label, value, onChange, min = -100, max = 300, step = 0.5, unit = '%', colorClass = 'text-yellow-300' }) => {
+  const handleStep = (delta: number) => {
+    const newVal = Math.min(max, Math.max(min, Math.round((value + delta) * 10) / 10));
+    onChange(newVal);
+  };
+
+  return (
+    <div className="space-y-1.5 bg-black/50 p-2 sm:p-2.5 rounded-xl border border-white/10 hover:border-red-500/30 transition-all shadow-inner">
+      <div className="flex items-center justify-between text-[10px]">
+        <span className="text-gray-200 font-extrabold uppercase tracking-wider flex items-center gap-1">
+          {label}
+        </span>
+        <div className="flex items-center gap-1 font-mono font-bold">
+          <input
+            type="number"
+            step="0.1"
+            min={min}
+            max={max}
+            value={value}
+            onChange={(e) => {
+              const parsed = parseFloat(e.target.value);
+              if (!isNaN(parsed)) {
+                onChange(Math.min(max, Math.max(min, Math.round(parsed * 10) / 10)));
+              }
+            }}
+            className={`w-16 px-1.5 py-0.5 bg-black/90 border border-white/20 rounded text-right text-xs ${colorClass} focus:outline-none focus:border-red-500 font-mono font-bold shadow-sm`}
+          />
+          <span className="text-gray-400 text-[10px]">{unit}</span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(parseFloat(e.target.value))}
+          className="flex-1 accent-red-500 cursor-pointer h-1.5"
+        />
+      </div>
+
+      <div className="flex items-center justify-between gap-1 pt-1 border-t border-white/5">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => handleStep(-5)}
+            className="px-1.5 py-0.5 bg-white/5 hover:bg-white/20 active:scale-95 text-gray-300 rounded text-[9px] font-mono font-black transition cursor-pointer"
+            title="Diminuir 5%"
+          >
+            -5
+          </button>
+          <button
+            type="button"
+            onClick={() => handleStep(-1)}
+            className="px-1.5 py-0.5 bg-white/5 hover:bg-white/20 active:scale-95 text-gray-300 rounded text-[9px] font-mono font-black transition cursor-pointer"
+            title="Diminuir 1%"
+          >
+            -1
+          </button>
+          <button
+            type="button"
+            onClick={() => handleStep(-0.5)}
+            className="px-1.5 py-0.5 bg-red-950/80 hover:bg-red-900 border border-red-500/40 active:scale-95 text-red-300 rounded text-[9px] font-mono font-black transition cursor-pointer"
+            title="Diminuir 0.5% (Ajuste Fino)"
+          >
+            -0.5
+          </button>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => handleStep(0.5)}
+            className="px-1.5 py-0.5 bg-red-950/80 hover:bg-red-900 border border-red-500/40 active:scale-95 text-red-300 rounded text-[9px] font-mono font-black transition cursor-pointer"
+            title="Aumentar 0.5% (Ajuste Fino)"
+          >
+            +0.5
+          </button>
+          <button
+            type="button"
+            onClick={() => handleStep(1)}
+            className="px-1.5 py-0.5 bg-white/5 hover:bg-white/20 active:scale-95 text-gray-300 rounded text-[9px] font-mono font-black transition cursor-pointer"
+            title="Aumentar 1%"
+          >
+            +1
+          </button>
+          <button
+            type="button"
+            onClick={() => handleStep(5)}
+            className="px-1.5 py-0.5 bg-white/5 hover:bg-white/20 active:scale-95 text-gray-300 rounded text-[9px] font-mono font-black transition cursor-pointer"
+            title="Aumentar 5%"
+          >
+            +5
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   isOpen,
   onClose,
@@ -46,6 +160,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   onResetStats,
   engineConfig,
   onUpdateEngineConfig,
+  onOpenCriadorDesigner,
 }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [pinInput, setPinInput] = useState<string>('');
@@ -56,6 +171,12 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
 
   const [openSection, setOpenSection] = useState<'position' | 'ui' | 'bonus' | 'buttons'>('position');
   const [mobileLayoutView, setMobileLayoutView] = useState<'controls' | 'preview'>('controls');
+
+  // Advanced Precision PC Features State
+  const [showGridLines, setShowGridLines] = useState<boolean>(true);
+  const [dragPrecisionMode, setDragPrecisionMode] = useState<'fine' | 'normal'>('fine');
+  const [previewProfile, setPreviewProfile] = useState<'phone' | 'samsung' | 'pc_large' | 'desktop_full'>('pc_large');
+  const [workspaceZoom, setWorkspaceZoom] = useState<number>(100);
   
   // Custom button creator state
   const [btnLabel, setBtnLabel] = useState<string>('RODADA BÔNUS');
@@ -293,6 +414,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     };
   };
 
+  const roundPrecision = (val: number) => {
+    return dragPrecisionMode === 'fine' ? Math.round(val * 10) / 10 : Math.round(val);
+  };
+
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!previewCanvasRef.current) return;
     const rect = previewCanvasRef.current.getBoundingClientRect();
@@ -300,26 +425,26 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     if (isDraggingBg) {
       const deltaX = ((e.clientX - dragStartRef.current.x) / rect.width) * 100;
       const deltaY = ((e.clientY - dragStartRef.current.y) / rect.height) * 100;
-      const newX = Math.max(-100, Math.min(100, Math.round(dragStartRef.current.initialX + deltaX)));
-      const newY = Math.max(-100, Math.min(100, Math.round(dragStartRef.current.initialY + deltaY)));
+      const newX = Math.max(-100, Math.min(100, roundPrecision(dragStartRef.current.initialX + deltaX)));
+      const newY = Math.max(-100, Math.min(100, roundPrecision(dragStartRef.current.initialY + deltaY)));
       onUpdateAdminConfig({ bgPosX: newX, bgPosY: newY });
     } else if (isDraggingSlot) {
       const deltaX = ((e.clientX - dragStartRef.current.x) / rect.width) * 100;
       const deltaY = ((e.clientY - dragStartRef.current.y) / rect.height) * 100;
-      const newLeft = Math.max(0, Math.min(100 - (adminConfig.slotWidth ?? 40), Math.round(dragStartRef.current.initialX + deltaX)));
-      const newTop = Math.max(0, Math.min(100 - (adminConfig.slotHeight ?? 40), Math.round(dragStartRef.current.initialY + deltaY)));
+      const newLeft = Math.max(0, Math.min(100 - (adminConfig.slotWidth ?? 40), roundPrecision(dragStartRef.current.initialX + deltaX)));
+      const newTop = Math.max(0, Math.min(100 - (adminConfig.slotHeight ?? 40), roundPrecision(dragStartRef.current.initialY + deltaY)));
       onUpdateAdminConfig({ slotLeft: newLeft, slotTop: newTop });
     } else if (isResizingSlot) {
       const deltaX = ((e.clientX - dragStartRef.current.x) / rect.width) * 100;
       const deltaY = ((e.clientY - dragStartRef.current.y) / rect.height) * 100;
-      const newWidth = Math.max(15, Math.min(90, Math.round(dragStartRef.current.initialWidth + deltaX)));
-      const newHeight = Math.max(15, Math.min(90, Math.round(dragStartRef.current.initialHeight + deltaY)));
+      const newWidth = Math.max(15, Math.min(90, roundPrecision(dragStartRef.current.initialWidth + deltaX)));
+      const newHeight = Math.max(15, Math.min(90, roundPrecision(dragStartRef.current.initialHeight + deltaY)));
       onUpdateAdminConfig({ slotWidth: newWidth, slotHeight: newHeight });
     } else if (isDraggingSpin) {
       const deltaX = ((e.clientX - dragStartRef.current.x) / rect.width) * 100;
       const deltaY = ((dragStartRef.current.y - e.clientY) / rect.height) * 100; // inverted Y for bottom
-      const newLeft = Math.max(10, Math.min(90, Math.round(dragStartRef.current.initialX + deltaX)));
-      const newBottom = Math.max(0, Math.min(80, Math.round(dragStartRef.current.initialY + deltaY)));
+      const newLeft = Math.max(10, Math.min(90, roundPrecision(dragStartRef.current.initialX + deltaX)));
+      const newBottom = Math.max(0, Math.min(80, roundPrecision(dragStartRef.current.initialY + deltaY)));
       onUpdateAdminConfig({ spinLeft: newLeft, spinBottom: newBottom });
     }
   };
@@ -338,26 +463,26 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
     if (isDraggingBg) {
       const deltaX = ((touch.clientX - dragStartRef.current.x) / rect.width) * 100;
       const deltaY = ((touch.clientY - dragStartRef.current.y) / rect.height) * 100;
-      const newX = Math.max(-100, Math.min(100, Math.round(dragStartRef.current.initialX + deltaX)));
-      const newY = Math.max(-100, Math.min(100, Math.round(dragStartRef.current.initialY + deltaY)));
+      const newX = Math.max(-100, Math.min(100, roundPrecision(dragStartRef.current.initialX + deltaX)));
+      const newY = Math.max(-100, Math.min(100, roundPrecision(dragStartRef.current.initialY + deltaY)));
       onUpdateAdminConfig({ bgPosX: newX, bgPosY: newY });
     } else if (isDraggingSlot) {
       const deltaX = ((touch.clientX - dragStartRef.current.x) / rect.width) * 100;
       const deltaY = ((touch.clientY - dragStartRef.current.y) / rect.height) * 100;
-      const newLeft = Math.max(0, Math.min(100 - (adminConfig.slotWidth ?? 40), Math.round(dragStartRef.current.initialX + deltaX)));
-      const newTop = Math.max(0, Math.min(100 - (adminConfig.slotHeight ?? 40), Math.round(dragStartRef.current.initialY + deltaY)));
+      const newLeft = Math.max(0, Math.min(100 - (adminConfig.slotWidth ?? 40), roundPrecision(dragStartRef.current.initialX + deltaX)));
+      const newTop = Math.max(0, Math.min(100 - (adminConfig.slotHeight ?? 40), roundPrecision(dragStartRef.current.initialY + deltaY)));
       onUpdateAdminConfig({ slotLeft: newLeft, slotTop: newTop });
     } else if (isResizingSlot) {
       const deltaX = ((touch.clientX - dragStartRef.current.x) / rect.width) * 100;
       const deltaY = ((touch.clientY - dragStartRef.current.y) / rect.height) * 100;
-      const newWidth = Math.max(15, Math.min(90, Math.round(dragStartRef.current.initialWidth + deltaX)));
-      const newHeight = Math.max(15, Math.min(90, Math.round(dragStartRef.current.initialHeight + deltaY)));
+      const newWidth = Math.max(15, Math.min(90, roundPrecision(dragStartRef.current.initialWidth + deltaX)));
+      const newHeight = Math.max(15, Math.min(90, roundPrecision(dragStartRef.current.initialHeight + deltaY)));
       onUpdateAdminConfig({ slotWidth: newWidth, slotHeight: newHeight });
     } else if (isDraggingSpin) {
       const deltaX = ((touch.clientX - dragStartRef.current.x) / rect.width) * 100;
       const deltaY = ((dragStartRef.current.y - touch.clientY) / rect.height) * 100; // inverted Y for bottom
-      const newLeft = Math.max(10, Math.min(90, Math.round(dragStartRef.current.initialX + deltaX)));
-      const newBottom = Math.max(0, Math.min(80, Math.round(dragStartRef.current.initialY + deltaY)));
+      const newLeft = Math.max(10, Math.min(90, roundPrecision(dragStartRef.current.initialX + deltaX)));
+      const newBottom = Math.max(0, Math.min(80, roundPrecision(dragStartRef.current.initialY + deltaY)));
       onUpdateAdminConfig({ spinLeft: newLeft, spinBottom: newBottom });
     }
   };
@@ -392,12 +517,25 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
             </span>
           </div>
 
-          <button 
-            onClick={onClose}
-            className="p-1.5 rounded-lg bg-black/50 hover:bg-white/10 text-gray-400 hover:text-white transition cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {onOpenCriadorDesigner && (
+              <button
+                type="button"
+                onClick={onOpenCriadorDesigner}
+                className="px-3 py-1 bg-gradient-to-r from-red-600 via-amber-500 to-yellow-400 text-black font-black text-xs rounded-lg shadow-md hover:scale-105 transition flex items-center gap-1.5 cursor-pointer uppercase tracking-wider"
+              >
+                <Sparkles className="w-3.5 h-3.5 fill-black" />
+                <span>Estúdio Criador Designer</span>
+              </button>
+            )}
+
+            <button 
+              onClick={onClose}
+              className="p-1.5 rounded-lg bg-black/50 hover:bg-white/10 text-gray-400 hover:text-white transition cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {!isAuthenticated ? (
@@ -780,6 +918,204 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       </div>
                     </div>
                   </div>
+
+                  {/* VELOCIDADES E TEMPOS DE GIRO */}
+                  <div className="bg-black/40 p-3.5 rounded-xl border border-red-900/40 space-y-3">
+                    <span className="text-xs font-bold text-red-300 uppercase tracking-widest flex items-center gap-1.5">
+                      <Activity className="w-4 h-4 text-red-400" />
+                      Velocidades da Rolagem dos Rolos (Normal & Turbo)
+                    </span>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] text-gray-300 font-bold">
+                          <span>Modo Normal (ms):</span>
+                          <span className="text-amber-300 font-mono">{adminConfig.spinSpeedNormal ?? 1200} ms</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="300"
+                          max="2500"
+                          step="50"
+                          value={adminConfig.spinSpeedNormal ?? 1200}
+                          onChange={(e) => onUpdateAdminConfig({ spinSpeedNormal: parseInt(e.target.value) })}
+                          className="w-full accent-amber-500 cursor-pointer h-1.5"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] text-gray-300 font-bold">
+                          <span>Modo Turbo (ms):</span>
+                          <span className="text-red-400 font-mono">{adminConfig.spinSpeedTurbo ?? 350} ms</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="100"
+                          max="800"
+                          step="25"
+                          value={adminConfig.spinSpeedTurbo ?? 350}
+                          onChange={(e) => onUpdateAdminConfig({ spinSpeedTurbo: parseInt(e.target.value) })}
+                          className="w-full accent-red-500 cursor-pointer h-1.5"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] text-gray-300 font-bold">
+                          <span>Intervalo Stagger (ms):</span>
+                          <span className="text-yellow-300 font-mono">{adminConfig.reelStaggerDelay ?? 120} ms</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="30"
+                          max="300"
+                          step="10"
+                          value={adminConfig.reelStaggerDelay ?? 120}
+                          onChange={(e) => onUpdateAdminConfig({ reelStaggerDelay: parseInt(e.target.value) })}
+                          className="w-full accent-yellow-400 cursor-pointer h-1.5"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* REGRAS DE ATIVAÇÃO DO BÔNUS & CARTAS SCATTER */}
+                  <div className="bg-black/40 p-3.5 rounded-xl border border-yellow-500/40 space-y-3.5">
+                    <div className="flex items-center justify-between border-b border-yellow-500/20 pb-2">
+                      <span className="text-xs font-black text-yellow-300 uppercase tracking-widest flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                        Regras de Ativação do Bônus & Cartas Scatter (Rodadas Grátis)
+                      </span>
+                      <span className="text-[10px] bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 px-2 py-0.5 rounded font-bold uppercase">
+                        Garantia Scatter Sem Linha
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-gray-300 leading-relaxed bg-black/50 p-2.5 rounded-lg border border-white/5">
+                      💡 <strong className="text-yellow-300">Como Funciona:</strong> Quando a quantidade configurada da <strong className="text-white font-black">Carta Bônus</strong> aparecer em qualquer posição do tabuleiro durante a mesma rodada (sem necessidade de formar linha de pagamento), o jogo ativa as <strong className="text-emerald-400 font-black">Rodadas Grátis</strong> instantaneamente!
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* CARTA BÔNUS ESCOLHIDA */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-gray-300 font-bold block uppercase">
+                          Qual é a Carta Bônus (Scatter Trigger):
+                        </label>
+                        <select
+                          value={adminConfig.bonusTriggerSymbolId || 'crown'}
+                          onChange={(e) => onUpdateAdminConfig({ bonusTriggerSymbolId: e.target.value })}
+                          className="w-full px-3 py-1.5 bg-black/80 border border-yellow-500/40 rounded-lg text-xs text-yellow-300 font-bold focus:outline-none focus:border-yellow-400 cursor-pointer"
+                        >
+                          {(engineConfig.symbols || []).map((sym) => (
+                            <option key={sym.id} value={sym.id}>
+                              {sym.image} {sym.name} ({sym.id})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* QUANTIDADE MÍNIMA DE CARTAS */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-gray-300 font-bold block uppercase">
+                          Qtd Mínima de Cartas no Tabuleiro para Liberar Bônus:
+                        </label>
+                        <select
+                          value={adminConfig.bonusMinCardsCount ?? 3}
+                          onChange={(e) => onUpdateAdminConfig({ bonusMinCardsCount: parseInt(e.target.value) })}
+                          className="w-full px-3 py-1.5 bg-black/80 border border-yellow-500/40 rounded-lg text-xs text-amber-300 font-bold focus:outline-none focus:border-yellow-400 cursor-pointer"
+                        >
+                          <option value={2}>2 Cartas Bônus no Tabuleiro</option>
+                          <option value={3}>3 Cartas Bônus no Tabuleiro (Padrão)</option>
+                          <option value={4}>4 Cartas Bônus no Tabuleiro</option>
+                          <option value={5}>5 Cartas Bônus no Tabuleiro</option>
+                        </select>
+                      </div>
+
+                      {/* QUANTIDADE DE RODADAS GRÁTIS */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-gray-300 font-bold block uppercase">
+                          Quantidade de Rodadas Grátis Concedidas:
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min="1"
+                            max="50"
+                            value={adminConfig.bonusFreeSpinsCount ?? 10}
+                            onChange={(e) => onUpdateAdminConfig({ bonusFreeSpinsCount: parseInt(e.target.value) || 10 })}
+                            className="w-full px-3 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-emerald-300 font-mono font-extrabold focus:outline-none focus:border-emerald-400"
+                          />
+                          <span className="text-xs text-gray-400 font-bold whitespace-nowrap">Rodadas</span>
+                        </div>
+                      </div>
+
+                      {/* MULTIPLICADOR DE IMPULSO DURANTE O BÔNUS */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-gray-300 font-bold block uppercase">
+                          Multiplicador dos Ganhos no Bônus:
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={adminConfig.bonusMultiplierBoost ?? 2}
+                            onChange={(e) => onUpdateAdminConfig({ bonusMultiplierBoost: parseFloat(e.target.value) })}
+                            className="w-full px-3 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-yellow-300 font-bold focus:outline-none cursor-pointer"
+                          >
+                            <option value={1}>1x (Sem multiplicador extra)</option>
+                            <option value={2}>2x (Prêmios dobrados!)</option>
+                            <option value={3}>3x (Prêmios triplicados!)</option>
+                            <option value={5}>5x (Prêmios x5!)</option>
+                            <option value={10}>10x (Prêmios x10 Super Bônus!)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* PRÊMIO INSTANTÂNEO NA ATIVAÇÃO */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-gray-300 font-bold block uppercase">
+                          Prêmio Instantâneo Pago na Ativação (x Aposta):
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={adminConfig.bonusInstantPayMultiplier ?? 5}
+                          onChange={(e) => onUpdateAdminConfig({ bonusInstantPayMultiplier: parseFloat(e.target.value) || 0 })}
+                          className="w-full px-3 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-amber-300 font-mono font-bold focus:outline-none"
+                        />
+                      </div>
+
+                      {/* PREÇO DA COMPRA DE BÔNUS */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-gray-300 font-bold block uppercase">
+                          Preço da Compra de Bônus (x Aposta):
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="500"
+                          value={adminConfig.buyBonusMultiplier ?? 50}
+                          onChange={(e) => onUpdateAdminConfig({ buyBonusMultiplier: parseFloat(e.target.value) || 50 })}
+                          className="w-full px-3 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-yellow-300 font-mono font-bold focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* BOTÃO TESTAR FORÇAR BÔNUS */}
+                    <div className="pt-2 border-t border-white/10 flex items-center justify-between">
+                      <span className="text-[11px] text-gray-300 font-bold">
+                        Forçar Bônus no Próximo Giro:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onUpdateAdminConfig({ forcedOutcome: 'bonus' as any });
+                          alert(`🎯 Próximo giro configurado para soltar ${adminConfig.bonusMinCardsCount ?? 3} Cartas Bônus e ativar as Rodadas Grátis!`);
+                        }}
+                        className="px-4 py-1.5 bg-gradient-to-r from-yellow-500 to-amber-600 text-black font-black text-xs uppercase tracking-wider rounded-lg shadow-lg hover:scale-105 active:scale-95 transition cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 fill-black" />
+                        <span>Soltar Bônus no Próximo Giro</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -903,118 +1239,76 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       <div className="space-y-3">
                         {openSection === 'position' && (
                           <div className="space-y-3 animate-in fade-in duration-200">
-                            {/* Fundo */}
-                            <div className="bg-black/40 p-3 rounded-xl border border-red-900/40 space-y-2">
-                              <span className="text-[10px] font-bold text-yellow-400 uppercase tracking-wider block">1. Fundo (Background)</span>
-                              <div className="grid grid-cols-2 gap-2">
-                                <div className="space-y-0.5">
-                                  <div className="flex justify-between text-[10px] text-gray-300">
-                                    <span>Posição X:</span>
-                                    <span className="font-mono text-yellow-300">{adminConfig.bgPosX || 0}%</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min="-100"
-                                    max="100"
-                                    value={adminConfig.bgPosX || 0}
-                                    onChange={(e) => onUpdateAdminConfig({ bgPosX: parseInt(e.target.value) })}
-                                    className="w-full accent-yellow-500 cursor-pointer h-1"
-                                  />
-                                </div>
-                                <div className="space-y-0.5">
-                                  <div className="flex justify-between text-[10px] text-gray-300">
-                                    <span>Posição Y:</span>
-                                    <span className="font-mono text-yellow-300">{adminConfig.bgPosY || 0}%</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min="-100"
-                                    max="100"
-                                    value={adminConfig.bgPosY || 0}
-                                    onChange={(e) => onUpdateAdminConfig({ bgPosY: parseInt(e.target.value) })}
-                                    className="w-full accent-yellow-500 cursor-pointer h-1"
-                                  />
-                                </div>
+                            {/* Fundo (Background) */}
+                            <div className="bg-black/40 p-3 rounded-xl border border-red-900/40 space-y-2.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-black text-yellow-400 uppercase tracking-wider block">1. Fundo (Background)</span>
+                                <span className="text-[9px] text-gray-400 font-mono">Precisão 0.1%</span>
                               </div>
-                              <div className="space-y-0.5">
-                                <div className="flex justify-between text-[10px] text-gray-300">
-                                  <span>Zoom Fundo:</span>
-                                  <span className="font-mono text-yellow-300">{adminConfig.bgZoom || 100}%</span>
-                                </div>
-                                <input
-                                  type="range"
-                                  min="100"
-                                  max="300"
-                                  value={adminConfig.bgZoom || 100}
-                                  onChange={(e) => onUpdateAdminConfig({ bgZoom: parseInt(e.target.value) })}
-                                  className="w-full accent-yellow-500 cursor-pointer h-1"
-                                />
-                              </div>
+                              <PrecisionControl
+                                label="Posição X (Horizontal)"
+                                value={adminConfig.bgPosX ?? 0}
+                                onChange={(val) => onUpdateAdminConfig({ bgPosX: val })}
+                                min={-100}
+                                max={100}
+                                colorClass="text-yellow-300"
+                              />
+                              <PrecisionControl
+                                label="Posição Y (Vertical)"
+                                value={adminConfig.bgPosY ?? 0}
+                                onChange={(val) => onUpdateAdminConfig({ bgPosY: val })}
+                                min={-100}
+                                max={100}
+                                colorClass="text-yellow-300"
+                              />
+                              <PrecisionControl
+                                label="Zoom / Escala Fundo"
+                                value={adminConfig.bgZoom ?? 100}
+                                onChange={(val) => onUpdateAdminConfig({ bgZoom: val })}
+                                min={100}
+                                max={300}
+                                colorClass="text-yellow-300"
+                              />
                             </div>
 
-                            {/* Quadro */}
-                            <div className="bg-black/40 p-3 rounded-xl border border-red-900/40 space-y-2">
-                              <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block">2. Quadro do Slot</span>
-                              <div className="grid grid-cols-2 gap-2">
-                                <div className="space-y-0.5">
-                                  <div className="flex justify-between text-[10px] text-gray-300">
-                                    <span>Largura:</span>
-                                    <span className="font-mono text-amber-300">{adminConfig.slotWidth ?? 40}%</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min="15"
-                                    max="100"
-                                    value={adminConfig.slotWidth ?? 40}
-                                    onChange={(e) => onUpdateAdminConfig({ slotWidth: parseInt(e.target.value) })}
-                                    className="w-full accent-amber-500 cursor-pointer h-1"
-                                  />
-                                </div>
-                                <div className="space-y-0.5">
-                                  <div className="flex justify-between text-[10px] text-gray-300">
-                                    <span>Altura:</span>
-                                    <span className="font-mono text-amber-300">{adminConfig.slotHeight ?? 40}%</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min="15"
-                                    max="100"
-                                    value={adminConfig.slotHeight ?? 40}
-                                    onChange={(e) => onUpdateAdminConfig({ slotHeight: parseInt(e.target.value) })}
-                                    className="w-full accent-amber-500 cursor-pointer h-1"
-                                  />
-                                </div>
+                            {/* Quadro do Slot */}
+                            <div className="bg-black/40 p-3 rounded-xl border border-red-900/40 space-y-2.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider block">2. Quadro do Slot</span>
+                                <span className="text-[9px] text-gray-400 font-mono">Precisão 0.1%</span>
                               </div>
-                              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-white/5">
-                                <div className="space-y-0.5">
-                                  <div className="flex justify-between text-[10px] text-gray-300">
-                                    <span>Margem Esquerda:</span>
-                                    <span className="font-mono text-amber-300">{adminConfig.slotLeft ?? 0}%</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min="0"
-                                    max="85"
-                                    value={adminConfig.slotLeft ?? 0}
-                                    onChange={(e) => onUpdateAdminConfig({ slotLeft: parseInt(e.target.value) })}
-                                    className="w-full accent-amber-500 cursor-pointer h-1"
-                                  />
-                                </div>
-                                <div className="space-y-0.5">
-                                  <div className="flex justify-between text-[10px] text-gray-300">
-                                    <span>Margem Topo:</span>
-                                    <span className="font-mono text-amber-300">{adminConfig.slotTop ?? 0}%</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min="0"
-                                    max="85"
-                                    value={adminConfig.slotTop ?? 0}
-                                    onChange={(e) => onUpdateAdminConfig({ slotTop: parseInt(e.target.value) })}
-                                    className="w-full accent-amber-500 cursor-pointer h-1"
-                                  />
-                                </div>
-                              </div>
+                              <PrecisionControl
+                                label="Largura (%)"
+                                value={adminConfig.slotWidth ?? 40}
+                                onChange={(val) => onUpdateAdminConfig({ slotWidth: val })}
+                                min={15}
+                                max={100}
+                                colorClass="text-amber-300"
+                              />
+                              <PrecisionControl
+                                label="Altura (%)"
+                                value={adminConfig.slotHeight ?? 40}
+                                onChange={(val) => onUpdateAdminConfig({ slotHeight: val })}
+                                min={15}
+                                max={100}
+                                colorClass="text-amber-300"
+                              />
+                              <PrecisionControl
+                                label="Margem Esquerda (%)"
+                                value={adminConfig.slotLeft ?? 0}
+                                onChange={(val) => onUpdateAdminConfig({ slotLeft: val })}
+                                min={0}
+                                max={85}
+                                colorClass="text-amber-300"
+                              />
+                              <PrecisionControl
+                                label="Margem Topo (%)"
+                                value={adminConfig.slotTop ?? 0}
+                                onChange={(val) => onUpdateAdminConfig({ slotTop: val })}
+                                min={0}
+                                max={85}
+                                colorClass="text-amber-300"
+                              />
                             </div>
 
                             {/* Quadro Styling */}
@@ -1058,52 +1352,35 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                             </div>
 
                             {/* Botão Girar */}
-                            <div className="bg-black/40 p-3 rounded-xl border border-red-900/40 space-y-2">
-                              <span className="text-[10px] font-bold text-red-400 uppercase tracking-wider block">3. Botão GIRAR</span>
-                              <div className="grid grid-cols-2 gap-2">
-                                <div className="space-y-0.5">
-                                  <div className="flex justify-between text-[10px] text-gray-300">
-                                    <span>Posição X:</span>
-                                    <span className="font-mono text-red-300">{adminConfig.spinLeft ?? 50}%</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min="10"
-                                    max="90"
-                                    value={adminConfig.spinLeft ?? 50}
-                                    onChange={(e) => onUpdateAdminConfig({ spinLeft: parseInt(e.target.value) })}
-                                    className="w-full accent-red-500 cursor-pointer h-1"
-                                  />
-                                </div>
-                                <div className="space-y-0.5">
-                                  <div className="flex justify-between text-[10px] text-gray-300">
-                                    <span>Posição Y (Inf.):</span>
-                                    <span className="font-mono text-red-300">{adminConfig.spinBottom ?? 4}%</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min="0"
-                                    max="80"
-                                    value={adminConfig.spinBottom ?? 4}
-                                    onChange={(e) => onUpdateAdminConfig({ spinBottom: parseInt(e.target.value) })}
-                                    className="w-full accent-red-500 cursor-pointer h-1"
-                                  />
-                                </div>
+                            <div className="bg-black/40 p-3 rounded-xl border border-red-900/40 space-y-2.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-black text-red-400 uppercase tracking-wider block">3. Botão GIRAR</span>
+                                <span className="text-[9px] text-gray-400 font-mono">Precisão 0.1%</span>
                               </div>
-                              <div className="space-y-0.5">
-                                <div className="flex justify-between text-[10px] text-gray-300">
-                                  <span>Escala / Tamanho:</span>
-                                  <span className="font-mono text-red-300">{adminConfig.spinScale ?? 100}%</span>
-                                </div>
-                                <input
-                                  type="range"
-                                  min="40"
-                                  max="200"
-                                  value={adminConfig.spinScale ?? 100}
-                                  onChange={(e) => onUpdateAdminConfig({ spinScale: parseInt(e.target.value) })}
-                                  className="w-full accent-red-500 cursor-pointer h-1"
-                                />
-                              </div>
+                              <PrecisionControl
+                                label="Posição X (%)"
+                                value={adminConfig.spinLeft ?? 50}
+                                onChange={(val) => onUpdateAdminConfig({ spinLeft: val })}
+                                min={10}
+                                max={90}
+                                colorClass="text-red-300"
+                              />
+                              <PrecisionControl
+                                label="Posição Y Inferior (%)"
+                                value={adminConfig.spinBottom ?? 4}
+                                onChange={(val) => onUpdateAdminConfig({ spinBottom: val })}
+                                min={0}
+                                max={80}
+                                colorClass="text-red-300"
+                              />
+                              <PrecisionControl
+                                label="Escala / Tamanho (%)"
+                                value={adminConfig.spinScale ?? 100}
+                                onChange={(val) => onUpdateAdminConfig({ spinScale: val })}
+                                min={40}
+                                max={200}
+                                colorClass="text-red-300"
+                              />
                             </div>
                           </div>
                         )}
@@ -1487,122 +1764,218 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                   </div>
 
                   {/* Right Column: Visual Device Workspace Viewport */}
-                  <div className={`${mobileLayoutView === 'preview' ? 'flex' : 'hidden lg:flex'} lg:col-span-7 bg-[#0b0c10] rounded-2xl border border-red-500/20 p-4 flex-col items-center justify-center relative min-h-[460px] lg:h-[72vh] overflow-hidden`}>
-                    <div className="absolute top-3 left-4 flex items-center gap-1.5 text-xs text-gray-300 font-bold bg-black/60 px-3 py-1.5 rounded-full border border-white/5 shadow-md pointer-events-none z-10">
-                      <Eye className="w-3.5 h-3.5 text-amber-500" />
-                      <span>Área Dedicada de Simulação Real</span>
-                    </div>
+                  <div className={`${mobileLayoutView === 'preview' ? 'flex' : 'hidden lg:flex'} lg:col-span-7 bg-[#08090d] rounded-2xl border border-red-500/30 p-3 sm:p-4 flex-col items-center justify-between relative min-h-[500px] lg:h-[76vh] overflow-hidden shadow-2xl`}>
+                    
+                    {/* PC Workspace Control Toolbar */}
+                    <div className="w-full flex flex-wrap items-center justify-between gap-2 bg-black/80 backdrop-blur-md p-2 rounded-xl border border-white/10 z-30 shadow-lg">
+                      <div className="flex items-center gap-1.5">
+                        <Eye className="w-4 h-4 text-amber-400" />
+                        <span className="text-xs font-black text-amber-200 uppercase tracking-wider hidden sm:inline">
+                          Simulador de Precisão PC
+                        </span>
+                      </div>
 
-                    <div className="absolute top-3 right-4 flex items-center gap-1.5 text-[9px] text-gray-400 bg-neutral-900 px-2 py-1 rounded-md border border-white/5 pointer-events-none z-10">
-                      <span>Proporção: 9:16</span>
-                    </div>
-
-                    {/* Guidelines Crosshair & Grid in Workspace */}
-                    <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(#1c1d24_1px,transparent_1px)] [background-size:16px_16px] opacity-40" />
-
-                    <div 
-                      ref={previewCanvasRef}
-                      onMouseDown={handleBgMouseDown}
-                      onMouseMove={handleMouseMove}
-                      onMouseUp={handleMouseUp}
-                      onMouseLeave={handleMouseUp}
-                      onTouchStart={handleBgTouchStart}
-                      onTouchMove={handleTouchMove}
-                      onTouchEnd={handleTouchEnd}
-                      className="relative w-full max-w-[280px] lg:max-w-[290px] h-full max-h-[490px] lg:max-h-[550px] aspect-[9/16] bg-black rounded-3xl border-2 border-red-500/50 overflow-hidden shadow-[0_0_30px_rgba(239,68,68,0.25)] cursor-grab active:cursor-grabbing select-none touch-none z-20"
-                    >
-                      {/* Background Layer (Image or Loop Video) */}
-                      <BackgroundMedia 
-                        src={adminConfig.bgImage}
-                        posX={adminConfig.bgPosX}
-                        posY={adminConfig.bgPosY}
-                        zoom={adminConfig.bgZoom}
-                        mediaType={adminConfig.bgMediaType}
-                      />
-
-                      {/* Interactive Draggable & Resizable Slot Box Frame */}
-                      <div
-                        onMouseDown={handleSlotMouseDown}
-                        onTouchStart={handleSlotTouchStart}
-                        style={{
-                          top: `${adminConfig.slotTop ?? 28}%`,
-                          left: `${adminConfig.slotLeft ?? 4}%`,
-                          width: `${adminConfig.slotWidth ?? 92}%`,
-                          height: `${adminConfig.slotHeight ?? 38}%`,
-                        }}
-                        className="absolute border-2 border-amber-400 bg-black/50 backdrop-blur-xs rounded-xl flex flex-col items-center justify-center cursor-move shadow-[0_0_20px_rgba(251,191,36,0.6)] hover:border-yellow-200 transition-colors z-20 group"
-                      >
-                        <div className="absolute -top-6 bg-amber-400 text-black px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider shadow pointer-events-none z-30 whitespace-nowrap">
-                          Quadro do Slot (Mover)
-                        </div>
-
-                        {/* Real SlotMachine rendered inside preview for 100% visual fidelity */}
-                        <div className="w-full h-full pointer-events-none flex items-center justify-center p-1">
-                          <SlotMachine 
-                            isSpinning={false} 
-                            grid={[
-                              ['Castle', 'Sword', 'Diamond', 'Crown', 'Lion'],
-                              ['Shield', 'Queen', 'Dragon', 'King', 'Coin'],
-                              ['Lion', 'Diamond', 'Castle', 'Sword', 'Crown']
-                            ]} 
-                            customSymbols={adminConfig.customSymbols}
-                            customSymbolConfigs={adminConfig.customSymbolConfigs}
-                          />
-                        </div>
-
-                        {/* Bottom-Right Resize Handle */}
-                        <div
-                          onMouseDown={handleSlotResizeMouseDown}
-                          onTouchStart={handleSlotResizeTouchStart}
-                          className="absolute -bottom-2 -right-2 w-5 h-5 bg-amber-400 hover:bg-yellow-200 border border-black rounded-full cursor-se-resize shadow-lg flex items-center justify-center z-30"
-                          title="Arraste para Redimensionar o Slot"
+                      {/* Device Profile Selectors */}
+                      <div className="flex items-center gap-1 bg-white/5 p-1 rounded-lg border border-white/10">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewProfile('phone')}
+                          className={`px-2 py-1 rounded text-[10px] font-bold transition flex items-center gap-1 cursor-pointer ${previewProfile === 'phone' ? 'bg-red-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                          title="Visão Celular Padrão (290px)"
                         >
-                          <div className="w-2 h-2 border-r-2 border-b-2 border-black" />
-                        </div>
+                          <Smartphone className="w-3 h-3" />
+                          <span className="hidden md:inline">Celular (290px)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewProfile('pc_large')}
+                          className={`px-2 py-1 rounded text-[10px] font-bold transition flex items-center gap-1 cursor-pointer ${previewProfile === 'pc_large' ? 'bg-red-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                          title="Visão Expandida PC (360px)"
+                        >
+                          <Monitor className="w-3 h-3" />
+                          <span className="hidden md:inline">PC Ampliado (360px)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewProfile('desktop_full')}
+                          className={`px-2 py-1 rounded text-[10px] font-bold transition flex items-center gap-1 cursor-pointer ${previewProfile === 'desktop_full' ? 'bg-red-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                          title="Visão Max Workstation PC (420px)"
+                        >
+                          <Maximize2 className="w-3 h-3" />
+                          <span className="hidden md:inline">PC Máximo (420px)</span>
+                        </button>
                       </div>
 
-                      {/* Interactive Draggable Spin Button in Canvas */}
-                      <div
-                        onMouseDown={handleSpinMouseDown}
-                        onTouchStart={handleSpinTouchStart}
-                        style={{
-                          bottom: `${adminConfig.spinBottom ?? 4}%`,
-                          left: `${adminConfig.spinLeft ?? 50}%`,
-                          transform: `translateX(-50%) scale(${(adminConfig.spinScale ?? 100) / 100})`,
-                        }}
-                        className="absolute z-20 cursor-move bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 p-2 px-4 rounded-full border-2 border-white shadow-[0_0_15px_rgba(250,204,21,0.8)] text-black font-black text-xs uppercase tracking-wider flex items-center gap-1.5 hover:scale-105 transition-transform"
-                      >
-                        <div className="w-2 h-2 rounded-full bg-red-600 animate-ping" />
-                        <span>GIRAR (Arraste)</span>
-                      </div>
+                      {/* Toggles: Gridlines, Sensitivity & Zoom */}
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setShowGridLines(!showGridLines)}
+                          className={`px-2 py-1 rounded text-[10px] font-bold border transition flex items-center gap-1 cursor-pointer ${showGridLines ? 'bg-amber-500/20 border-amber-500/50 text-amber-300' : 'bg-black/60 border-white/10 text-gray-400 hover:text-white'}`}
+                          title="Grade de Alinhamento 10%"
+                        >
+                          <Grid className="w-3 h-3" />
+                          <span className="hidden xl:inline">Grade 10%</span>
+                        </button>
 
-                      {/* Live preview of custom buttons inside device simulation workspace */}
-                      {(adminConfig.customButtons || []).map((btn) => {
-                        if (!btn.isActive) return null;
-                        return (
-                          <div
-                            key={btn.id}
-                            style={{
-                              left: `${btn.posX}%`,
-                              top: `${btn.posY}%`,
-                              transform: `translate(-50%, -50%) scale(${(btn.scale || 100) / 100})`,
-                            }}
-                            className={`absolute z-20 px-2.5 py-1.5 rounded-lg font-black text-[8px] tracking-wider uppercase shadow-md border border-white/10 pointer-events-none whitespace-nowrap truncate ${btn.bgColor} ${btn.textColor}`}
+                        <button
+                          type="button"
+                          onClick={() => setDragPrecisionMode(dragPrecisionMode === 'fine' ? 'normal' : 'fine')}
+                          className={`px-2 py-1 rounded text-[10px] font-mono font-bold border transition flex items-center gap-1 cursor-pointer ${dragPrecisionMode === 'fine' ? 'bg-red-500/20 border-red-500/50 text-red-300' : 'bg-black/60 border-white/10 text-gray-400'}`}
+                          title="Sensibilidade do Arraste: Fina (0.1%) / Normal (1%)"
+                        >
+                          <Crosshair className="w-3 h-3" />
+                          <span>{dragPrecisionMode === 'fine' ? '0.1%' : '1.0%'}</span>
+                        </button>
+
+                        <div className="flex items-center gap-0.5 bg-black/60 px-1.5 py-0.5 rounded border border-white/10">
+                          <button
+                            type="button"
+                            onClick={() => setWorkspaceZoom(Math.max(80, workspaceZoom - 10))}
+                            className="p-1 hover:text-white text-gray-400 cursor-pointer"
                           >
-                            {btn.label}
-                          </div>
-                        );
-                      })}
-
-                      {/* Info Badge */}
-                      <div className="absolute bottom-2 left-2 right-2 bg-black/90 backdrop-blur px-2 py-1.5 rounded-lg text-[9px] text-gray-300 font-mono pointer-events-none z-10 leading-normal border border-white/5">
-                        <div className="flex justify-between">
-                          <span>Slot: X:{adminConfig.slotLeft}% Y:{adminConfig.slotTop}%</span>
-                          <span>W:{adminConfig.slotWidth}% H:{adminConfig.slotHeight}%</span>
+                            <ZoomOut className="w-3 h-3" />
+                          </button>
+                          <span className="text-[10px] font-mono text-amber-300 px-1">{workspaceZoom}%</span>
+                          <button
+                            type="button"
+                            onClick={() => setWorkspaceZoom(Math.min(140, workspaceZoom + 10))}
+                            className="p-1 hover:text-white text-gray-400 cursor-pointer"
+                          >
+                            <ZoomIn className="w-3 h-3" />
+                          </button>
                         </div>
-                        <div className="flex justify-between mt-0.5 text-[8px] text-yellow-400">
-                          <span>Botão: X:{adminConfig.spinLeft}% Y:{100 - (adminConfig.spinBottom ?? 0)}%</span>
-                          <span>Fundo: zoom {adminConfig.bgZoom}%</span>
+                      </div>
+                    </div>
+
+                    {/* Canvas Container Wrapper */}
+                    <div className="w-full flex-1 flex items-center justify-center overflow-auto p-2 relative">
+                      <div 
+                        ref={previewCanvasRef}
+                        onMouseDown={handleBgMouseDown}
+                        onMouseMove={handleMouseMove}
+                        onMouseUp={handleMouseUp}
+                        onMouseLeave={handleMouseUp}
+                        onTouchStart={handleBgTouchStart}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleTouchEnd}
+                        style={{
+                          width: previewProfile === 'phone' ? '290px' : previewProfile === 'pc_large' ? '360px' : '420px',
+                          maxHeight: previewProfile === 'phone' ? '520px' : previewProfile === 'pc_large' ? '620px' : '680px',
+                          transform: `scale(${workspaceZoom / 100})`,
+                          transformOrigin: 'center center',
+                        }}
+                        className="relative w-full h-full aspect-[9/16] bg-black rounded-3xl border-2 border-red-500/60 overflow-hidden shadow-[0_0_40px_rgba(239,68,68,0.3)] cursor-grab active:cursor-grabbing select-none touch-none z-20 transition-all duration-200"
+                      >
+                        {/* Background Layer (Image or Loop Video) */}
+                        <BackgroundMedia 
+                          src={adminConfig.bgImage}
+                          posX={adminConfig.bgPosX}
+                          posY={adminConfig.bgPosY}
+                          zoom={adminConfig.bgZoom}
+                          mediaType={adminConfig.bgMediaType}
+                        />
+
+                        {/* Alignment Gridlines & Center Crosshair Overlay */}
+                        {showGridLines && (
+                          <div className="absolute inset-0 pointer-events-none z-10 opacity-35">
+                            <div className="w-full h-full grid grid-cols-10 grid-rows-10 border border-yellow-400/20">
+                              {Array.from({ length: 100 }).map((_, i) => (
+                                <div key={i} className="border-r border-b border-yellow-400/20 text-[6px] text-yellow-300 font-mono p-0.5 select-none">
+                                  {i % 10 === 0 ? `${i}%` : ''}
+                                </div>
+                              ))}
+                            </div>
+                            {/* Center Crosshairs */}
+                            <div className="absolute top-1/2 left-0 right-0 h-[1px] bg-red-500/80 shadow-[0_0_4px_red]" />
+                            <div className="absolute top-0 bottom-0 left-1/2 w-[1px] bg-red-500/80 shadow-[0_0_4px_red]" />
+                          </div>
+                        )}
+
+                        {/* Interactive Draggable & Resizable Slot Box Frame */}
+                        <div
+                          onMouseDown={handleSlotMouseDown}
+                          onTouchStart={handleSlotTouchStart}
+                          style={{
+                            top: `${adminConfig.slotTop ?? 28}%`,
+                            left: `${adminConfig.slotLeft ?? 4}%`,
+                            width: `${adminConfig.slotWidth ?? 92}%`,
+                            height: `${adminConfig.slotHeight ?? 38}%`,
+                          }}
+                          className="absolute border-2 border-amber-400 bg-black/50 backdrop-blur-xs rounded-xl flex flex-col items-center justify-center cursor-move shadow-[0_0_20px_rgba(251,191,36,0.6)] hover:border-yellow-200 transition-colors z-20 group"
+                        >
+                          <div className="absolute -top-6 bg-amber-400 text-black px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider shadow pointer-events-none z-30 whitespace-nowrap">
+                            Quadro Slot (X:{adminConfig.slotLeft}% Y:{adminConfig.slotTop}%)
+                          </div>
+
+                          {/* Real SlotMachine rendered inside preview for 100% visual fidelity */}
+                          <div className="w-full h-full pointer-events-none flex items-center justify-center p-1">
+                            <SlotMachine 
+                              isSpinning={false} 
+                              grid={[
+                                ['Castle', 'Sword', 'Diamond', 'Crown', 'Lion'],
+                                ['Shield', 'Queen', 'Dragon', 'King', 'Coin'],
+                                ['Lion', 'Diamond', 'Castle', 'Sword', 'Crown']
+                              ]} 
+                              customSymbols={adminConfig.customSymbols}
+                              customSymbolConfigs={adminConfig.customSymbolConfigs}
+                            />
+                          </div>
+
+                          {/* Bottom-Right Resize Handle */}
+                          <div
+                            onMouseDown={handleSlotResizeMouseDown}
+                            onTouchStart={handleSlotResizeTouchStart}
+                            className="absolute -bottom-2 -right-2 w-6 h-6 bg-amber-400 hover:bg-yellow-200 border-2 border-black rounded-full cursor-se-resize shadow-lg flex items-center justify-center z-30 active:scale-125 transition-transform"
+                            title="Arraste para Redimensionar o Slot"
+                          >
+                            <div className="w-2.5 h-2.5 border-r-2 border-b-2 border-black" />
+                          </div>
+                        </div>
+
+                        {/* Interactive Draggable Spin Button in Canvas */}
+                        <div
+                          onMouseDown={handleSpinMouseDown}
+                          onTouchStart={handleSpinTouchStart}
+                          style={{
+                            bottom: `${adminConfig.spinBottom ?? 4}%`,
+                            left: `${adminConfig.spinLeft ?? 50}%`,
+                            transform: `translateX(-50%) scale(${(adminConfig.spinScale ?? 100) / 100})`,
+                          }}
+                          className="absolute z-20 cursor-move bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 p-2 px-4 rounded-full border-2 border-white shadow-[0_0_15px_rgba(250,204,21,0.8)] text-black font-black text-xs uppercase tracking-wider flex items-center gap-1.5 hover:scale-105 transition-transform whitespace-nowrap"
+                        >
+                          <div className="w-2 h-2 rounded-full bg-red-600 animate-ping" />
+                          <span>GIRAR ({adminConfig.spinLeft}%, {adminConfig.spinBottom}%)</span>
+                        </div>
+
+                        {/* Live preview of custom buttons inside device simulation workspace */}
+                        {(adminConfig.customButtons || []).map((btn) => {
+                          if (!btn.isActive) return null;
+                          return (
+                            <div
+                              key={btn.id}
+                              style={{
+                                left: `${btn.posX}%`,
+                                top: `${btn.posY}%`,
+                                transform: `translate(-50%, -50%) scale(${(btn.scale || 100) / 100})`,
+                              }}
+                              className={`absolute z-20 px-2.5 py-1.5 rounded-lg font-black text-[8px] tracking-wider uppercase shadow-md border border-white/10 pointer-events-none whitespace-nowrap truncate ${btn.bgColor} ${btn.textColor}`}
+                            >
+                              {btn.label}
+                            </div>
+                          );
+                        })}
+
+                        {/* HUD Coordinates Monitor */}
+                        <div className="absolute bottom-2 left-2 right-2 bg-black/90 backdrop-blur px-2.5 py-1.5 rounded-xl text-[9px] text-gray-300 font-mono pointer-events-none z-20 leading-normal border border-red-500/30 shadow-lg">
+                          <div className="flex justify-between items-center text-amber-300 font-bold">
+                            <span>QUADRO: X:{adminConfig.slotLeft}% Y:{adminConfig.slotTop}%</span>
+                            <span>TAM: {adminConfig.slotWidth}%x{adminConfig.slotHeight}%</span>
+                          </div>
+                          <div className="flex justify-between items-center mt-0.5 text-[8px] text-red-300">
+                            <span>GIRAR: X:{adminConfig.spinLeft}% Y-Inf:{adminConfig.spinBottom}%</span>
+                            <span>FUNDO: X:{adminConfig.bgPosX}% Y:{adminConfig.bgPosY}% ({adminConfig.bgZoom}%)</span>
+                          </div>
                         </div>
                       </div>
                     </div>

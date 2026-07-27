@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { motion, useAnimation } from 'motion/react';
 import { SymbolType, SymbolImageConfig } from '../types';
 import { SlotSymbol } from './SlotSymbol';
@@ -16,9 +16,44 @@ interface SlotReelProps {
   bet?: number;
   customCashImages?: Record<number, string>;
   isAnticipating?: boolean;
+  slotHideGrid?: boolean;
+  anticipationColor?: 'gold' | 'red' | 'purple' | 'cyan' | 'neon_green';
 }
 
 const ALL_SYMBOLS: string[] = ['King', 'Queen', 'Crown', 'Lion', 'Sword', 'Shield', 'Castle', 'Diamond', 'Coin', 'Dragon'];
+
+const ANTICIPATION_STYLES: Record<string, { ring: string; shadow: string; badgeBg: string; textGlow: string }> = {
+  gold: {
+    ring: 'ring-4 ring-amber-400 border-amber-300',
+    shadow: 'shadow-[0_0_50px_rgba(245,158,11,0.95),inset_0_0_25px_rgba(245,158,11,0.6)]',
+    badgeBg: 'from-amber-600 via-yellow-500 to-amber-600 border-amber-300 text-black',
+    textGlow: 'bg-gradient-to-b from-amber-500/30 via-yellow-500/15 to-amber-500/30',
+  },
+  red: {
+    ring: 'ring-4 ring-red-500 border-red-400',
+    shadow: 'shadow-[0_0_50px_rgba(239,68,68,0.95),inset_0_0_25px_rgba(239,68,68,0.6)]',
+    badgeBg: 'from-red-700 via-rose-600 to-red-700 border-red-300 text-white',
+    textGlow: 'bg-gradient-to-b from-red-600/30 via-rose-500/15 to-red-600/30',
+  },
+  purple: {
+    ring: 'ring-4 ring-purple-500 border-purple-400',
+    shadow: 'shadow-[0_0_50px_rgba(168,85,247,0.95),inset_0_0_25px_rgba(168,85,247,0.6)]',
+    badgeBg: 'from-purple-700 via-fuchsia-600 to-purple-700 border-purple-300 text-white',
+    textGlow: 'bg-gradient-to-b from-purple-600/30 via-fuchsia-500/15 to-purple-600/30',
+  },
+  cyan: {
+    ring: 'ring-4 ring-cyan-400 border-cyan-300',
+    shadow: 'shadow-[0_0_50px_rgba(6,182,212,0.95),inset_0_0_25px_rgba(6,182,212,0.6)]',
+    badgeBg: 'from-cyan-600 via-blue-500 to-cyan-600 border-cyan-200 text-black',
+    textGlow: 'bg-gradient-to-b from-cyan-500/30 via-blue-500/15 to-cyan-500/30',
+  },
+  neon_green: {
+    ring: 'ring-4 ring-emerald-400 border-emerald-300',
+    shadow: 'shadow-[0_0_50px_rgba(16,185,129,0.95),inset_0_0_25px_rgba(16,185,129,0.6)]',
+    badgeBg: 'from-emerald-600 via-lime-500 to-emerald-600 border-lime-300 text-black',
+    textGlow: 'bg-gradient-to-b from-emerald-500/30 via-lime-500/15 to-emerald-500/30',
+  },
+};
 
 export const SlotReel: React.FC<SlotReelProps> = ({ 
   isSpinning, 
@@ -32,20 +67,24 @@ export const SlotReel: React.FC<SlotReelProps> = ({
   cashMultipliers,
   bet,
   customCashImages,
-  isAnticipating = false
+  isAnticipating = false,
+  slotHideGrid = false,
+  anticipationColor = 'gold'
 }) => {
   const [currentSymbols, setCurrentSymbols] = useState<string[]>(resultSymbols);
   const [reelSpinning, setReelSpinning] = useState<boolean>(false);
-  const [playBounce, setPlayBounce] = useState<boolean>(false);
   const controls = useAnimation();
+  const stopTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const rowsCount = currentSymbols.length || 3;
   const spinningMultiplier = 5;
   const totalSpinningItems = rowsCount * spinningMultiplier;
 
-  // Handles the spinning and stopping states
   useEffect(() => {
-    let stopTimer: NodeJS.Timeout;
+    if (stopTimerRef.current) {
+      clearTimeout(stopTimerRef.current);
+      stopTimerRef.current = null;
+    }
 
     if (isSpinning) {
       setReelSpinning(true);
@@ -55,50 +94,32 @@ export const SlotReel: React.FC<SlotReelProps> = ({
           y: {
             repeat: Infinity,
             repeatType: "loop",
-            duration: 0.35,
+            duration: 0.3,
             ease: "linear",
           }
         }
       });
     } else {
-      if (reelSpinning) {
-        // Reel was spinning, let's stop with a clean staggered delay
-        stopTimer = setTimeout(() => {
-          controls.stop();
-          setCurrentSymbols(resultSymbols);
-          setReelSpinning(false);
-          setPlayBounce(true);
-        }, delay);
-      } else {
-        // Simple state sync for mounting or changes to the board configuration
+      stopTimerRef.current = setTimeout(() => {
+        controls.stop();
         setCurrentSymbols(resultSymbols);
-        controls.set({ y: 0 });
-      }
+        setReelSpinning(false);
+        controls.set({ y: -12 });
+        controls.start({
+          y: 0,
+          transition: { type: "spring", stiffness: 400, damping: 25 }
+        });
+      }, Math.max(0, delay));
     }
 
     return () => {
-      clearTimeout(stopTimer);
+      if (stopTimerRef.current) {
+        clearTimeout(stopTimerRef.current);
+        stopTimerRef.current = null;
+      }
     };
-  }, [isSpinning, resultSymbols, delay, controls, reelSpinning]);
+  }, [isSpinning, resultSymbols, delay, controls]);
 
-  // Handle the landing bounce effect after the component has updated its DOM/dimensions
-  useEffect(() => {
-    if (playBounce) {
-      setPlayBounce(false);
-      
-      // Ensure we clean any ongoing animations first
-      controls.stop();
-      
-      // Perform the crisp spring bounce animation
-      controls.set({ y: -15 });
-      controls.start({
-        y: 0,
-        transition: { type: "spring", stiffness: 380, damping: 22 }
-      });
-    }
-  }, [playBounce, controls]);
-
-  // Generate a mathematically proportional list of random symbols for the spinning blur effect
   const spinPool = activeSymbols.length > 0 ? activeSymbols : ALL_SYMBOLS;
   const spinningColumn = Array.from({ length: totalSpinningItems }).map((_, i) => {
     const sym = spinPool[Math.floor(Math.random() * spinPool.length)];
@@ -112,23 +133,26 @@ export const SlotReel: React.FC<SlotReelProps> = ({
           type={sym} 
           customImage={customSymbols?.[sym]} 
           symbolConfig={customSymbolConfigs?.[sym]}
+          slotHideGrid={slotHideGrid}
         />
       </div>
     );
   });
 
+  const antStyle = ANTICIPATION_STYLES[anticipationColor] || ANTICIPATION_STYLES.gold;
+
   return (
     <div className={`relative flex-1 h-full max-w-[150px] overflow-hidden flex flex-col transition-all duration-300 ${
-      noSlotMargins 
+      noSlotMargins || slotHideGrid
         ? 'bg-transparent border-none shadow-none' 
         : 'bg-black/75 rounded-xl border-x border-[#4d3d00]/60 shadow-[inset_0_0_20px_rgba(0,0,0,0.9)]'
     } ${
       isAnticipating && reelSpinning
-        ? 'ring-4 ring-amber-500 ring-offset-2 ring-offset-black shadow-[0_0_40px_rgba(245,158,11,0.9),inset_0_0_20px_rgba(245,158,11,0.5)] border-amber-400 z-30 animate-pulse scale-[1.03]'
+        ? `${antStyle.ring} ${antStyle.shadow} z-30 animate-pulse scale-[1.03]`
         : ''
     }`}>
       {/* 3D Glass Light Overlay for Reel Depth */}
-      {!noSlotMargins && (
+      {(!noSlotMargins && !slotHideGrid) && (
         <>
           <div className="absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-white/5 to-transparent pointer-events-none z-10" />
           <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/60 to-transparent pointer-events-none z-10" />
@@ -139,9 +163,11 @@ export const SlotReel: React.FC<SlotReelProps> = ({
       {/* Anticipation Glow and Badge Overlays */}
       {isAnticipating && reelSpinning && (
         <>
-          <div className="absolute inset-0 bg-gradient-to-b from-amber-500/10 via-red-500/10 to-amber-500/10 pointer-events-none z-20 animate-pulse" />
-          <div className="absolute top-1.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-red-600 to-amber-600 border border-red-400 text-[8px] font-black px-1.5 py-0.5 rounded shadow-lg text-white z-20 animate-bounce tracking-widest whitespace-nowrap uppercase">
-            ⚡ AMEAÇA ⚡
+          <div className={`absolute inset-0 ${antStyle.textGlow} pointer-events-none z-20 animate-pulse`} />
+          <div className={`absolute top-1.5 left-1/2 -translate-x-1/2 bg-gradient-to-r ${antStyle.badgeBg} font-black text-[9px] px-2 py-0.5 rounded-full shadow-xl z-20 animate-bounce tracking-widest whitespace-nowrap uppercase flex items-center gap-1`}>
+            <span>⚡</span>
+            <span>AMEAÇA</span>
+            <span>⚡</span>
           </div>
         </>
       )}
@@ -166,6 +192,7 @@ export const SlotReel: React.FC<SlotReelProps> = ({
                 symbolConfig={customSymbolConfigs?.[symbol]}
                 cashMultiplier={cashMultipliers?.[i]}
                 bet={bet}
+                slotHideGrid={slotHideGrid}
               />
             ))}
           </div>

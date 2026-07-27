@@ -341,11 +341,19 @@ export function evaluateBoardWins(
   symbols: SlotSymbolConfig[],
   paylines: PaylineConfig[],
   bet: number,
-  cashGrid?: number[][]
+  cashGrid?: number[][],
+  options?: {
+    minCashCardsForWin?: number;
+    cashCardSinglePay?: boolean;
+    bonusTriggerSymbolId?: string;
+    bonusMinCardsCount?: number;
+    bonusInstantPayMultiplier?: number;
+  }
 ): {
   winningLines: LineWinResult[];
   totalPayoutAmount: number;
   totalMultiplier: number;
+  isBonusTriggered: boolean;
 } {
   // Check for FULL SCREEN (Big Win) with wild substitution
   let bestFsSymbol: SlotSymbolConfig | null = null;
@@ -387,6 +395,7 @@ export function evaluateBoardWins(
       }],
       totalPayoutAmount: fsPayout,
       totalMultiplier: bestFsMultiplier,
+      isBonusTriggered: false,
     };
   }
 
@@ -440,7 +449,6 @@ export function evaluateBoardWins(
   }
 
   // Evaluate special cash symbols collection
-  // "se vier 5 cartas de slot de dinheiro ele não multiplica, ele junta o valor do prêmio de cada carta e soma o valor das 5 e o total é o valor do ganho. Mas esse modo só vale se vier 5 slot de valor ganho de dinheiro."
   const cashCoords: { col: number; row: number }[] = [];
   for (let c = 0; c < grid.length; c++) {
     for (let r = 0; r < grid[c].length; r++) {
@@ -450,7 +458,10 @@ export function evaluateBoardWins(
     }
   }
 
-  if (cashCoords.length >= 5) {
+  const minRequired = options?.minCashCardsForWin ?? 5;
+  const singlePayAllowed = options?.cashCardSinglePay ?? false;
+
+  if (cashCoords.length >= minRequired || (singlePayAllowed && cashCoords.length > 0)) {
     let combinedCashMultiplier = 0;
     let combinedPayout = 0;
 
@@ -461,10 +472,13 @@ export function evaluateBoardWins(
     });
 
     const cashSymbolInfo = symbols.find(s => s.id === 'cash') || { name: 'Dinheiro', id: 'cash' };
+    const labelText = cashCoords.length >= minRequired
+      ? `${cashCoords.length}X CARTAS DE DINHEIRO (PRÊMIO COMPLETO)!`
+      : `CARTAS DE DINHEIRO (${cashCoords.length}x)!`;
 
     winningLines.push({
       paylineId: 'cash_collect_bonus',
-      paylineName: `${cashCoords.length}X ACÚMULO DE DINHEIRO!`,
+      paylineName: labelText,
       symbolId: 'cash',
       symbolName: cashSymbolInfo.name,
       coordinates: cashCoords,
@@ -477,10 +491,46 @@ export function evaluateBoardWins(
     totalMultiplier += combinedCashMultiplier;
   }
 
+  // Evaluate Scatter Bonus Trigger Cards (Anywhere on board, no payline required)
+  const bonusSymbolTarget = options?.bonusTriggerSymbolId || 'crown';
+  const minBonusCardsReq = options?.bonusMinCardsCount ?? 3;
+  const bonusCoords: { col: number; row: number }[] = [];
+
+  for (let c = 0; c < grid.length; c++) {
+    for (let r = 0; r < grid[c].length; r++) {
+      if (grid[c]?.[r] === bonusSymbolTarget) {
+        bonusCoords.push({ col: c, row: r });
+      }
+    }
+  }
+
+  let isBonusTriggered = false;
+  if (bonusCoords.length >= minBonusCardsReq) {
+    isBonusTriggered = true;
+    const bonusSymbolInfo = symbols.find(s => s.id === bonusSymbolTarget) || { name: 'Símbolo Bônus', id: bonusSymbolTarget };
+    const instantMult = options?.bonusInstantPayMultiplier ?? 5;
+    const instantPayout = bet * instantMult;
+
+    winningLines.push({
+      paylineId: 'bonus_scatter_trigger',
+      paylineName: `🎉 BÔNUS ATIVADO! (${bonusCoords.length}x ${bonusSymbolInfo.name.toUpperCase()})`,
+      symbolId: bonusSymbolTarget,
+      symbolName: bonusSymbolInfo.name,
+      coordinates: bonusCoords,
+      matchCount: bonusCoords.length,
+      multiplier: instantMult,
+      payoutAmount: instantPayout,
+    });
+
+    totalPayoutAmount += instantPayout;
+    totalMultiplier += instantMult;
+  }
+
   return {
     winningLines,
     totalPayoutAmount,
     totalMultiplier,
+    isBonusTriggered,
   };
 }
 

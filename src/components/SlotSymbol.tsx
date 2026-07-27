@@ -10,9 +10,10 @@ interface SlotSymbolProps {
   symbolConfig?: SymbolImageConfig;
   cashMultiplier?: number;
   bet?: number;
+  slotHideGrid?: boolean;
 }
 
-export const SlotSymbol: React.FC<SlotSymbolProps> = ({ type, isWinning, customImage, symbolConfig, cashMultiplier, bet }) => {
+export const SlotSymbol: React.FC<SlotSymbolProps> = ({ type, isWinning, customImage, symbolConfig, cashMultiplier, bet, slotHideGrid = false }) => {
   const imageUrl = symbolConfig?.url || customImage;
   const fitMode = symbolConfig?.objectFit || 'cover';
   const offsetX = symbolConfig?.offsetX || 0;
@@ -97,9 +98,11 @@ export const SlotSymbol: React.FC<SlotSymbolProps> = ({ type, isWinning, customI
     <div className={`relative flex items-center justify-center w-full h-full flex-1 min-h-0 symbol-container rounded-xl overflow-hidden transition-all duration-300 ${
       isWinning 
         ? 'bg-gradient-to-b from-[#3a2505] to-[#251502] border-2 border-yellow-400 z-10 scale-105 shadow-[0_0_25px_rgba(253,224,71,0.85),inset_0_0_12px_rgba(253,224,71,0.3)]' 
-        : isWild
-          ? 'bg-gradient-to-b from-[#210936]/90 via-[#120321]/90 to-black border border-purple-500/40 shadow-[inset_0_1px_3px_rgba(168,85,247,0.15),0_0_15px_rgba(168,85,247,0.25)] hover:border-purple-400/60'
-          : 'bg-gradient-to-b from-neutral-900/90 to-neutral-950/95 border border-[#4d3d00]/30 hover:border-[#997a00]/40 shadow-[inset_0_1px_3px_rgba(255,255,255,0.04)]'
+        : slotHideGrid
+          ? 'bg-transparent border-none shadow-none'
+          : isWild
+            ? 'bg-gradient-to-b from-[#210936]/90 via-[#120321]/90 to-black border border-purple-500/40 shadow-[inset_0_1px_3px_rgba(168,85,247,0.15),0_0_15px_rgba(168,85,247,0.25)] hover:border-purple-400/60'
+            : 'bg-gradient-to-b from-neutral-900/90 to-neutral-950/95 border border-[#4d3d00]/30 hover:border-[#997a00]/40 shadow-[inset_0_1px_3px_rgba(255,255,255,0.04)]'
     }`}>
       <motion.div
         animate={isWinning ? {
