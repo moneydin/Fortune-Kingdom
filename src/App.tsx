@@ -515,9 +515,10 @@ export default function App() {
     const turboSpeed = adminConfig.spinSpeedTurbo ?? 400;
     const baseSpeed = isTurbo ? turboSpeed : normalSpeed;
     const stagger = isTurbo ? Math.max(40, Math.floor((adminConfig.reelStaggerDelay ?? 140) / 3)) : (adminConfig.reelStaggerDelay ?? 140);
-    const anticipationExtra = isAnticipating && !isTurbo ? 2200 : 0;
+    const anticipationExtra = isAnticipating ? (isTurbo ? 800 : 2000) : 0;
     const spinDuration = baseSpeed;
-    const totalPresentationDelay = baseSpeed + (cols - 1) * stagger + anticipationExtra + 120;
+    const reelSettleBuffer = isTurbo ? 300 : 550;
+    const totalPresentationDelay = baseSpeed + (cols - 1) * stagger + anticipationExtra + reelSettleBuffer;
 
     // Trigger sequential reels stagger stop
     setTimeout(() => {
@@ -1009,7 +1010,7 @@ export default function App() {
               )}
 
               {/* Win Display */}
-              {gameState.win > 0 && (
+              {gameState.win > 0 && !gameState.isSpinning && (
                 <div className="flex items-center gap-1 bg-emerald-950/80 border border-emerald-500/50 px-2.5 py-1 rounded-xl animate-bounce">
                   <Trophy className="w-3.5 h-3.5 text-emerald-400" />
                   <span className="text-xs sm:text-sm font-black text-emerald-300">
@@ -1117,7 +1118,7 @@ export default function App() {
             hasAnticipation={hasAnticipation}
             slotHideGrid={adminConfig.slotHideGrid ?? false}
             staggerDelay={gameSettings.turboMode ? Math.max(30, Math.floor((adminConfig.reelStaggerDelay ?? 120) / 3)) : (adminConfig.reelStaggerDelay ?? 120)}
-            anticipationExtraDelay={gameSettings.turboMode ? 800 : 1800}
+            anticipationExtraDelay={gameSettings.turboMode ? 800 : 2000}
             cashAnticipationColor={adminConfig.cashAnticipationColor ?? 'gold'}
           />
         </div>
