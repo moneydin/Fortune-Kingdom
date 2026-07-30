@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { 
-  X, Smartphone, Monitor, Eye, Grid, Crosshair, ZoomIn, ZoomOut, Maximize2, 
+  X, Smartphone, Monitor, Eye, Grid, Crosshair, ZoomIn, ZoomOut, Maximize2, Minimize2, 
   RotateCcw, Sliders, Image as ImageIcon, Sparkles, Plus, Trash2, Move, 
   Type as TypeIcon, Layers, Palette, Play, Settings, DollarSign, Trophy,
   ChevronRight, CheckCircle2, Shield, Flame, Activity, Coins, Minus, Zap, Volume2,
@@ -101,6 +101,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
   const [toolbarTab, setToolbarTab] = useState<'board' | 'layout' | 'size'>('board');
   const [showGridLines, setShowGridLines] = useState<boolean>(true);
   const [dragPrecisionMode, setDragPrecisionMode] = useState<'fine' | 'normal'>('fine');
+  const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
 
   // Dragging states
   const previewCanvasRef = useRef<HTMLDivElement>(null);
@@ -142,6 +143,8 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
 
     if (target === 'phone') {
       startWidth = phoneWidth;
+    } else if (target === 'background') {
+      startScale = adminConfig.bgZoom ?? 100;
     } else if (target === 'slot') {
       startWidth = adminConfig.slotWidth ?? 92;
       startHeight = adminConfig.slotHeight ?? 38;
@@ -197,6 +200,11 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
       const curY = adminConfig.buyBonusPosY ?? 71;
       const pctStep = nudgeStep === 1 ? 0.5 : nudgeStep;
       onUpdateAdminConfig({ buyBonusPosX: roundPrecision(curX + dirX * pctStep), buyBonusPosY: roundPrecision(curY + dirY * pctStep) });
+    } else if (nudgeTarget === 'background') {
+      const curX = adminConfig.bgPosX ?? 0;
+      const curY = adminConfig.bgPosY ?? 0;
+      const pctStep = nudgeStep === 1 ? 1 : nudgeStep * 2;
+      onUpdateAdminConfig({ bgPosX: roundPrecision(curX + dirX * pctStep), bgPosY: roundPrecision(curY + dirY * pctStep) });
     } else if (nudgeTarget?.startsWith('button-')) {
       const btnId = nudgeTarget.replace('button-', '');
       const btn = (adminConfig.customButtons || []).find(b => b.id === btnId);
@@ -248,6 +256,11 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
       onUpdateAdminConfig({
         ...(alignX && { buyBonusPosX: 50 }),
         ...(alignY && { buyBonusPosY: 71 }),
+      });
+    } else if (nudgeTarget === 'background') {
+      onUpdateAdminConfig({
+        ...(alignX && { bgPosX: 0 }),
+        ...(alignY && { bgPosY: 0 }),
       });
     } else if (nudgeTarget?.startsWith('button-')) {
       const btnId = nudgeTarget.replace('button-', '');
@@ -397,6 +410,10 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
           slotWidth: newSlotWidth,
           slotHeight: newSlotHeight
         });
+      } else if (resizingTarget === 'background') {
+        const factorX = (resizeHandle === 'tr' || resizeHandle === 'br') ? 1 : -1;
+        const newZoom = Math.max(50, Math.min(500, Math.round(resizeStartRef.current.startScale + deltaX * factorX * 0.8)));
+        onUpdateAdminConfig({ bgZoom: newZoom });
       } else if (resizingTarget === 'spin') {
         const factorX = (resizeHandle === 'tr' || resizeHandle === 'br') ? 1 : -1;
         const newSpinScale = Math.max(40, Math.min(250, Math.round(resizeStartRef.current.startScale + deltaX * factorX * 0.8)));
@@ -439,6 +456,15 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
       const newPhoneX = Math.round(dragStartRef.current.initialX + pixelDeltaX);
       const newPhoneY = Math.round(dragStartRef.current.initialY + pixelDeltaY);
       onUpdateAdminConfig({ phonePosX: newPhoneX, phonePosY: newPhoneY });
+    } else if (draggingTarget === 'background') {
+      const panDeltaX = Math.round((e.clientX - dragStartRef.current.x) * 0.5);
+      const panDeltaY = Math.round((e.clientY - dragStartRef.current.y) * 0.5);
+      const newOffsetX = Math.max(-200, Math.min(200, dragStartRef.current.initialX + panDeltaX));
+      const newOffsetY = Math.max(-200, Math.min(200, dragStartRef.current.initialY + panDeltaY));
+      onUpdateAdminConfig({
+        bgPosX: newOffsetX,
+        bgPosY: newOffsetY
+      });
     } else if (draggingTarget === 'toolbar') {
       const pixelDeltaX = e.clientX - dragStartRef.current.x;
       const pixelDeltaY = e.clientY - dragStartRef.current.y;
@@ -729,6 +755,20 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
         <div className="flex items-center gap-2">
           <button
             type="button"
+            onClick={() => setIsFocusMode(!isFocusMode)}
+            className={`p-2 rounded-xl transition cursor-pointer border flex items-center gap-1.5 text-xs font-black ${
+              isFocusMode 
+                ? 'bg-amber-500 text-black border-amber-400 font-black shadow-[0_0_15px_rgba(245,158,11,0.5)] scale-105' 
+                : 'bg-white/5 hover:bg-white/10 text-gray-300 border-white/10'
+            }`}
+            title={isFocusMode ? "Sair do Modo Foco (Mostrar Painel Lateral)" : "Entrar no Modo Foco (Ocular Painel Lateral)"}
+          >
+            {isFocusMode ? <Minimize2 className="w-4 h-4 text-black animate-pulse" /> : <Maximize2 className="w-4 h-4 text-amber-400" />}
+            <span>{isFocusMode ? "Modo Normal" : "Modo Foco (Tela Cheia)"}</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setIsLocked(true)}
             className="p-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-xl transition cursor-pointer border border-white/10"
             title="Bloquear Painel"
@@ -751,7 +791,8 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
         
         {/* Left Control Panel (5 Cols) */}
-        <div className="lg:col-span-5 bg-[#08090d] border-r border-red-500/20 flex flex-col h-full overflow-hidden">
+        {!isFocusMode && (
+          <div className="lg:col-span-5 bg-[#08090d] border-r border-red-500/20 flex flex-col h-full overflow-hidden">
           
           {/* Main Navigation Tabs */}
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-1 p-2 bg-black/80 border-b border-white/10 text-xs">
@@ -2147,6 +2188,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
             )}
           </div>
         </div>
+      )}
 
         {/* Right Studio Canvas: Interactive Live Simulator Stage (7 Cols) */}
         <div 
@@ -2154,7 +2196,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
-          className="lg:col-span-7 bg-[#040508] p-4 flex flex-col items-center justify-center relative overflow-hidden select-none min-h-[500px]"
+          className={`${isFocusMode ? 'lg:col-span-12' : 'lg:col-span-7'} bg-[#040508] p-4 flex flex-col items-center justify-center relative overflow-hidden select-none min-h-[500px] transition-all duration-300`}
         >
           {/* Alignment Crosshairs Overlay */}
           {showGridLines && (
@@ -2311,6 +2353,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                     className="bg-neutral-900 border border-white/10 text-amber-300 font-bold text-[10px] px-2 py-1 rounded cursor-pointer focus:outline-none"
                   >
                     <option value="phone">📱 Celular (Fundo)</option>
+                    <option value="background">🖼️ Imagem de Fundo (Upload)</option>
                     <option value="slot">🎰 Moldura do Slot</option>
                     <option value="spin">🔘 Botão de Girar</option>
                     <option value="buyBonus">⭐ Botão Comprar Bônus</option>
@@ -2556,6 +2599,66 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                           onChange={(e) => onUpdateAdminConfig({ buyBonusScale: parseInt(e.target.value) })}
                           className="w-full accent-yellow-400 h-1 cursor-pointer"
                         />
+                      </div>
+                    )}
+
+                    {/* If selected target is BACKGROUND */}
+                    {nudgeTarget === 'background' && (
+                      <div className="space-y-2.5">
+                        <div>
+                          <div className="flex justify-between text-[9px] text-gray-300 font-bold">
+                            <span>Zoom da Imagem (%):</span>
+                            <span className="text-yellow-400 font-mono">{adminConfig.bgZoom ?? 100}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="50"
+                            max="500"
+                            step="5"
+                            value={adminConfig.bgZoom ?? 100}
+                            onChange={(e) => onUpdateAdminConfig({ bgZoom: parseInt(e.target.value) })}
+                            className="w-full accent-yellow-400 h-1 cursor-pointer"
+                          />
+                        </div>
+                        <div>
+                          <div className="flex justify-between text-[9px] text-gray-300 font-bold">
+                            <span>Posição Horizontal X (%):</span>
+                            <span className="text-yellow-400 font-mono">{adminConfig.bgPosX ?? 0}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="-200"
+                            max="200"
+                            step="1"
+                            value={adminConfig.bgPosX ?? 0}
+                            onChange={(e) => onUpdateAdminConfig({ bgPosX: parseInt(e.target.value) })}
+                            className="w-full accent-yellow-400 h-1 cursor-pointer"
+                          />
+                        </div>
+                        <div>
+                          <div className="flex justify-between text-[9px] text-gray-300 font-bold">
+                            <span>Posição Vertical Y (%):</span>
+                            <span className="text-yellow-400 font-mono">{adminConfig.bgPosY ?? 0}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="-200"
+                            max="200"
+                            step="1"
+                            value={adminConfig.bgPosY ?? 0}
+                            onChange={(e) => onUpdateAdminConfig({ bgPosY: parseInt(e.target.value) })}
+                            className="w-full accent-yellow-400 h-1 cursor-pointer"
+                          />
+                        </div>
+                        <div className="pt-1 flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => onUpdateAdminConfig({ bgPosX: 0, bgPosY: 0, bgZoom: 100 })}
+                            className="w-full py-1 text-[9px] font-black uppercase text-center rounded transition bg-neutral-800 border border-neutral-700 text-amber-300 hover:bg-neutral-700 cursor-pointer"
+                          >
+                            Resetar Imagem
+                          </button>
+                        </div>
                       </div>
                     )}
 
@@ -2813,6 +2916,48 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                 zoom={adminConfig.bgZoom}
                 mediaType={adminConfig.bgMediaType}
               />
+
+              {/* Clickable drag handler layer for Background Media */}
+              <div 
+                className={`absolute inset-0 z-0 cursor-grab active:cursor-grabbing ${
+                  nudgeTarget === 'background' ? 'ring-4 ring-dashed ring-amber-500/85 ring-inset rounded-[30px]' : ''
+                }`}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  handleStartDrag('background', adminConfig.bgPosX ?? 0, adminConfig.bgPosY ?? 0, e.clientX, e.clientY);
+                  setNudgeTarget('background');
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setNudgeTarget('background');
+                }}
+              />
+
+              {/* Interactive Corner Resize Handles for Background when active */}
+              {nudgeTarget === 'background' && (
+                <div className="absolute inset-0 pointer-events-none z-10 rounded-[30px] overflow-hidden">
+                  <div 
+                    onMouseDown={(e) => handleStartResize('background', 'tl', e)}
+                    className="absolute top-4 left-4 w-4 h-4 bg-amber-500 border border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                    title="Zoom da Imagem (Arrastar)"
+                  />
+                  <div 
+                    onMouseDown={(e) => handleStartResize('background', 'tr', e)}
+                    className="absolute top-4 right-4 w-4 h-4 bg-amber-500 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                    title="Zoom da Imagem (Arrastar)"
+                  />
+                  <div 
+                    onMouseDown={(e) => handleStartResize('background', 'bl', e)}
+                    className="absolute bottom-4 left-4 w-4 h-4 bg-amber-500 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                    title="Zoom da Imagem (Arrastar)"
+                  />
+                  <div 
+                    onMouseDown={(e) => handleStartResize('background', 'br', e)}
+                    className="absolute bottom-4 right-4 w-4 h-4 bg-amber-500 border border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                    title="Zoom da Imagem (Arrastar)"
+                  />
+                </div>
+              )}
 
               {/* Draggable Slot Frame */}
               <div
@@ -3162,9 +3307,10 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
             </div>
 
             {/* Target Element Selector */}
-            <div className="grid grid-cols-4 gap-1">
+            <div className="grid grid-cols-5 gap-1">
               {[
                 { id: 'phone', label: '📱 Celular', valX: adminConfig.phonePosX ?? 0, valY: adminConfig.phonePosY ?? 0, unit: 'px' },
+                { id: 'background', label: '🖼️ Imagem', valX: adminConfig.bgPosX ?? 0, valY: adminConfig.bgPosY ?? 0, unit: '%' },
                 { id: 'toolbar', label: '🎯 Ferramenta', valX: adminConfig.toolbarPosX ?? 0, valY: adminConfig.toolbarPosY ?? 0, unit: 'px' },
                 { id: 'slot', label: '🎰 Slot', valX: adminConfig.slotLeft ?? 4, valY: adminConfig.slotTop ?? 28, unit: '%' },
                 { id: 'spin', label: '🔘 Girar', valX: adminConfig.spinLeft ?? 50, valY: adminConfig.spinBottom ?? 4, unit: '%' },
@@ -3256,6 +3402,16 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Floating Focus Mode Control Toggle on Canvas */}
+          <button
+            type="button"
+            onClick={() => setIsFocusMode(!isFocusMode)}
+            className="absolute bottom-4 right-4 z-40 bg-black/85 backdrop-blur-md border border-white/10 hover:border-amber-500/50 text-xs text-gray-300 hover:text-white px-3 py-2 rounded-xl flex items-center gap-2 transition-all cursor-pointer shadow-lg active:scale-95"
+          >
+            <div className={`w-2 h-2 rounded-full ${isFocusMode ? 'bg-amber-400 animate-pulse' : 'bg-gray-500'}`} />
+            <span>{isFocusMode ? "Sair da Tela Cheia" : "Modo Foco / Tela Cheia"}</span>
+          </button>
         </div>
       </div>
     </div>
