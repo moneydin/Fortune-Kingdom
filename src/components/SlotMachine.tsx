@@ -29,7 +29,7 @@ const PaylineOverlay: React.FC<PaylineOverlayProps> = ({
 
   return (
     <svg 
-      className="absolute inset-0 w-full h-full pointer-events-none z-20 overflow-visible"
+      className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-visible"
       viewBox="0 0 100 100"
       preserveAspectRatio="none"
     >
@@ -165,7 +165,7 @@ export const SlotMachine: React.FC<SlotMachineProps> = ({
       />
 
       {/* Main Grid - Background is transparent to show background graphics */}
-      <div className={`flex w-full h-full justify-center items-center transition-all duration-300 ${
+      <div className={`relative z-10 flex w-full h-full justify-center items-center transition-all duration-300 ${
         noSlotMargins || slotHideGrid ? 'gap-0 sm:gap-0.5' : 'gap-0.5 sm:gap-1.5 md:gap-2'
       }`}>
         {grid.map((column, index) => {

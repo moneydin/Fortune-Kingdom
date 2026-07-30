@@ -718,7 +718,7 @@ export default function App() {
           }
         }
       }
-    }, spinDuration);
+    }, totalPresentationDelay);
   };
 
   const handleBuyBonusClick = () => {
