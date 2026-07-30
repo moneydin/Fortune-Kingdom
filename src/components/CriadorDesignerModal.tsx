@@ -4,7 +4,8 @@ import {
   RotateCcw, Sliders, Image as ImageIcon, Sparkles, Plus, Trash2, Move, 
   Type as TypeIcon, Layers, Palette, Play, Settings, DollarSign, Trophy,
   ChevronRight, CheckCircle2, Shield, Flame, Activity, Coins, Minus, Zap, Volume2,
-  Lock, Unlock, Key, RefreshCw, Award, Upload, Check, LayoutGrid, Dices
+  Lock, Unlock, Key, RefreshCw, Award, Upload, Check, LayoutGrid, Dices,
+  GripHorizontal, ArrowUp, ArrowDown, ArrowLeft, ArrowRight
 } from 'lucide-react';
 import { AdminConfig, CustomButtonConfig, CustomTextConfig, GameState, SymbolType, SymbolImageConfig, BoardType, SpinRollStyle } from '../types';
 import { SlotMachine } from './SlotMachine';
@@ -101,6 +102,32 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
   const activeRollStyle = SPIN_ROLL_STYLES.find(s => s.id === (adminConfig.spinRollStyle || 'standard')) || SPIN_ROLL_STYLES[0];
   const [draggingTarget, setDraggingTarget] = useState<string | null>(null);
   const dragStartRef = useRef<{ x: number; y: number; initialX: number; initialY: number }>({ x: 0, y: 0, initialX: 0, initialY: 0 });
+
+  // Pixel Precision Nudge State
+  const [nudgeTarget, setNudgeTarget] = useState<'phone' | 'toolbar' | 'slot' | 'spin'>('phone');
+  const [nudgeStep, setNudgeStep] = useState<number>(1); // 1px, 5px, 10px
+
+  const handleNudge = (dirX: number, dirY: number) => {
+    if (nudgeTarget === 'phone') {
+      const curX = adminConfig.phonePosX ?? 0;
+      const curY = adminConfig.phonePosY ?? 0;
+      onUpdateAdminConfig({ phonePosX: curX + dirX * nudgeStep, phonePosY: curY + dirY * nudgeStep });
+    } else if (nudgeTarget === 'toolbar') {
+      const curX = adminConfig.toolbarPosX ?? 0;
+      const curY = adminConfig.toolbarPosY ?? 0;
+      onUpdateAdminConfig({ toolbarPosX: curX + dirX * nudgeStep, toolbarPosY: curY + dirY * nudgeStep });
+    } else if (nudgeTarget === 'slot') {
+      const curX = adminConfig.slotLeft ?? 4;
+      const curY = adminConfig.slotTop ?? 28;
+      const pctStep = nudgeStep === 1 ? 0.5 : nudgeStep;
+      onUpdateAdminConfig({ slotLeft: roundPrecision(curX + dirX * pctStep), slotTop: roundPrecision(curY + dirY * pctStep) });
+    } else if (nudgeTarget === 'spin') {
+      const curX = adminConfig.spinLeft ?? 50;
+      const curY = adminConfig.spinBottom ?? 4;
+      const pctStep = nudgeStep === 1 ? 0.5 : nudgeStep;
+      onUpdateAdminConfig({ spinLeft: roundPrecision(curX + dirX * pctStep), spinBottom: roundPrecision(curY - dirY * pctStep) });
+    }
+  };
 
   // Custom button creator state
   const [btnLabel, setBtnLabel] = useState<string>('BÔNUS GRÁTIS');
@@ -204,7 +231,19 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
     const newX = Math.max(-50, Math.min(150, roundPrecision(dragStartRef.current.initialX + deltaX)));
     const newY = Math.max(-50, Math.min(150, roundPrecision(dragStartRef.current.initialY + deltaY)));
 
-    if (draggingTarget === 'slot') {
+    if (draggingTarget === 'phone') {
+      const pixelDeltaX = e.clientX - dragStartRef.current.x;
+      const pixelDeltaY = e.clientY - dragStartRef.current.y;
+      const newPhoneX = Math.round(dragStartRef.current.initialX + pixelDeltaX);
+      const newPhoneY = Math.round(dragStartRef.current.initialY + pixelDeltaY);
+      onUpdateAdminConfig({ phonePosX: newPhoneX, phonePosY: newPhoneY });
+    } else if (draggingTarget === 'toolbar') {
+      const pixelDeltaX = e.clientX - dragStartRef.current.x;
+      const pixelDeltaY = e.clientY - dragStartRef.current.y;
+      const newToolbarX = Math.round(dragStartRef.current.initialX + pixelDeltaX);
+      const newToolbarY = Math.round(dragStartRef.current.initialY + pixelDeltaY);
+      onUpdateAdminConfig({ toolbarPosX: newToolbarX, toolbarPosY: newToolbarY });
+    } else if (draggingTarget === 'slot') {
       onUpdateAdminConfig({ slotLeft: newX, slotTop: newY });
     } else if (draggingTarget === 'spin') {
       onUpdateAdminConfig({ spinLeft: newX, spinBottom: 100 - newY });
@@ -1624,22 +1663,39 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
             </div>
           )}
 
-          {/* Preview Control Header: Tabuleiro e Rolagem Selector Bar */}
-          <div className="w-full max-w-[420px] bg-black/90 backdrop-blur-md border border-amber-500/40 rounded-2xl p-2.5 mb-3 shadow-[0_0_30px_rgba(245,158,11,0.15)] z-30 space-y-2">
-            <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
+          {/* Preview Control Header: Tabuleiro e Rolagem Selector Bar (Draggable) */}
+          <div 
+            style={{
+              transform: `translate(${adminConfig.toolbarPosX ?? 0}px, ${adminConfig.toolbarPosY ?? 0}px)`
+            }}
+            className="w-full max-w-[440px] bg-black/90 backdrop-blur-md border border-amber-500/40 rounded-2xl p-2.5 mb-3 shadow-[0_0_35px_rgba(245,158,11,0.2)] z-30 space-y-2 select-none relative transition-transform duration-75"
+          >
+            <div 
+              onMouseDown={(e) => handleStartDrag('toolbar', adminConfig.toolbarPosX ?? 0, adminConfig.toolbarPosY ?? 0, e.clientX, e.clientY)}
+              className="flex items-center justify-between border-b border-white/10 pb-1.5 cursor-grab active:cursor-grabbing hover:bg-white/5 px-1 py-0.5 rounded-lg transition"
+            >
               <div className="flex items-center gap-1.5">
-                <div className="p-1 rounded bg-amber-500/20 text-amber-300">
-                  <LayoutGrid className="w-3.5 h-3.5" />
-                </div>
+                <GripHorizontal className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
                 <span className="text-[11px] font-black uppercase text-amber-300 tracking-wider">
-                  Tabuleiro Ativo: <b className="text-white font-mono">{activeBoardType}</b> ({activeBoardDims.cols} Colunas × {activeBoardDims.rows} Linhas)
+                  Ferramenta de Tabuleiro ({activeBoardType})
                 </span>
               </div>
 
-              <span className="text-[9px] font-black uppercase text-amber-300 bg-amber-950/90 px-2 py-0.5 rounded-full border border-amber-500/40 flex items-center gap-1 shadow-sm">
-                <span>{activeRollStyle.icon}</span>
-                <span>{activeRollStyle.label}</span>
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] font-mono text-gray-300 bg-black/60 px-1.5 py-0.5 rounded border border-white/10">
+                  X: {adminConfig.toolbarPosX ?? 0}px | Y: {adminConfig.toolbarPosY ?? 0}px
+                </span>
+                {(adminConfig.toolbarPosX !== 0 || adminConfig.toolbarPosY !== 0) && (
+                  <button
+                    type="button"
+                    title="Resetar Posição da Ferramenta"
+                    onClick={(e) => { e.stopPropagation(); onUpdateAdminConfig({ toolbarPosX: 0, toolbarPosY: 0 }); }}
+                    className="p-1 bg-red-950/80 hover:bg-red-600 text-red-300 hover:text-white rounded transition cursor-pointer"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Fast Swap Board Pills */}
@@ -1696,14 +1752,38 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
             </div>
           </div>
 
-          {/* Phone Simulator Frame */}
+          {/* Phone Simulator Frame (Draggable) */}
           <div 
-            style={{ width: `${phoneWidth}px` }}
-            className="relative aspect-[9/16] bg-black rounded-[38px] border-[8px] border-neutral-800 overflow-hidden shadow-[0_0_60px_rgba(239,68,68,0.3)] flex flex-col justify-between z-20 transition-all duration-200"
+            style={{ 
+              width: `${phoneWidth}px`,
+              transform: `translate(${adminConfig.phonePosX ?? 0}px, ${adminConfig.phonePosY ?? 0}px)`
+            }}
+            className="relative aspect-[9/16] bg-black rounded-[38px] border-[8px] border-neutral-800 overflow-hidden shadow-[0_0_60px_rgba(239,68,68,0.3)] flex flex-col justify-between z-20 transition-transform duration-75 select-none"
           >
-            {/* Speaker Notch */}
-            <div className="absolute top-2 left-1/2 -translate-x-1/2 w-20 h-3 bg-neutral-900 rounded-full z-40 flex items-center justify-center">
-              <div className="w-8 h-1 bg-neutral-700 rounded-full" />
+            {/* Draggable Top Handle Bar over Notch */}
+            <div 
+              onMouseDown={(e) => handleStartDrag('phone', adminConfig.phonePosX ?? 0, adminConfig.phonePosY ?? 0, e.clientX, e.clientY)}
+              className="w-full bg-gradient-to-r from-neutral-900 via-neutral-800 to-neutral-900 border-b border-amber-500/40 px-3 py-1 flex items-center justify-between cursor-grab active:cursor-grabbing hover:bg-neutral-800 z-50 transition"
+            >
+              <div className="flex items-center gap-1.5">
+                <Move className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-300">
+                  Mover Celular (X:{adminConfig.phonePosX ?? 0}px Y:{adminConfig.phonePosY ?? 0}px)
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                {(adminConfig.phonePosX !== 0 || adminConfig.phonePosY !== 0) && (
+                  <button
+                    type="button"
+                    title="Centralizar Celular"
+                    onClick={(e) => { e.stopPropagation(); onUpdateAdminConfig({ phonePosX: 0, phonePosY: 0 }); }}
+                    className="p-1 bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-black rounded transition cursor-pointer"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Background Media */}
@@ -1824,6 +1904,130 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                 {txt.text}
               </div>
             ))}
+          </div>
+
+          {/* Pixel Precision Control Panel (Painel de Ajuste Fino por Pixels) */}
+          <div className="w-full max-w-[440px] bg-black/90 backdrop-blur-md border border-amber-500/40 rounded-2xl p-2.5 mt-3 shadow-xl z-30 space-y-2 select-none">
+            <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
+              <div className="flex items-center gap-1.5">
+                <Crosshair className="w-4 h-4 text-amber-400" />
+                <span className="text-[11px] font-black uppercase text-amber-300 tracking-wider">
+                  Controle de Precisão Pixel a Pixel
+                </span>
+              </div>
+
+              {/* Step selector */}
+              <div className="flex items-center gap-1">
+                <span className="text-[9px] text-gray-400 font-bold uppercase">Passo:</span>
+                {[1, 5, 10].map((step) => (
+                  <button
+                    key={step}
+                    type="button"
+                    onClick={() => setNudgeStep(step)}
+                    className={`px-1.5 py-0.5 rounded text-[9px] font-black transition cursor-pointer ${
+                      nudgeStep === step ? 'bg-amber-400 text-black font-bold' : 'bg-neutral-800 text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    {step}px
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Target Element Selector */}
+            <div className="grid grid-cols-4 gap-1">
+              {[
+                { id: 'phone', label: '📱 Celular', valX: adminConfig.phonePosX ?? 0, valY: adminConfig.phonePosY ?? 0, unit: 'px' },
+                { id: 'toolbar', label: '🎯 Ferramenta', valX: adminConfig.toolbarPosX ?? 0, valY: adminConfig.toolbarPosY ?? 0, unit: 'px' },
+                { id: 'slot', label: '🎰 Slot', valX: adminConfig.slotLeft ?? 4, valY: adminConfig.slotTop ?? 28, unit: '%' },
+                { id: 'spin', label: '🔘 Girar', valX: adminConfig.spinLeft ?? 50, valY: adminConfig.spinBottom ?? 4, unit: '%' },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setNudgeTarget(t.id as any)}
+                  className={`p-1.5 rounded-lg text-center transition cursor-pointer border ${
+                    nudgeTarget === t.id
+                      ? 'bg-amber-500/20 border-amber-400 text-amber-300 font-black shadow-md'
+                      : 'bg-neutral-900/90 border-white/10 text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <div className="text-[10px] font-bold leading-tight">{t.label}</div>
+                  <div className="text-[8px] font-mono opacity-80 mt-0.5">
+                    X:{t.valX}{t.unit} Y:{t.valY}{t.unit}
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Arrow Nudge Pad & Numerical Controls */}
+            <div className="flex items-center justify-between gap-3 bg-black/60 p-2 rounded-xl border border-white/10">
+              <div className="text-[10px] text-gray-300">
+                <span className="font-bold text-amber-300 uppercase block">Ajuste Direcional:</span>
+                <span className="text-[9px] text-gray-400">Mover {nudgeTarget} em {nudgeStep}px</span>
+              </div>
+
+              {/* 4-Way Arrow Pad */}
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  title={`Mover p/ Esquerda (${nudgeStep}px)`}
+                  onClick={() => handleNudge(-1, 0)}
+                  className="p-2 bg-neutral-800 hover:bg-amber-500 hover:text-black text-gray-200 rounded-lg border border-white/10 transition cursor-pointer active:scale-95"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                </button>
+
+                <div className="flex flex-col gap-1">
+                  <button
+                    type="button"
+                    title={`Mover p/ Cima (${nudgeStep}px)`}
+                    onClick={() => handleNudge(0, -1)}
+                    className="p-2 bg-neutral-800 hover:bg-amber-500 hover:text-black text-gray-200 rounded-lg border border-white/10 transition cursor-pointer active:scale-95"
+                  >
+                    <ArrowUp className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    title={`Mover p/ Baixo (${nudgeStep}px)`}
+                    onClick={() => handleNudge(0, 1)}
+                    className="p-2 bg-neutral-800 hover:bg-amber-500 hover:text-black text-gray-200 rounded-lg border border-white/10 transition cursor-pointer active:scale-95"
+                  >
+                    <ArrowDown className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  title={`Mover p/ Direita (${nudgeStep}px)`}
+                  onClick={() => handleNudge(1, 0)}
+                  className="p-2 bg-neutral-800 hover:bg-amber-500 hover:text-black text-gray-200 rounded-lg border border-white/10 transition cursor-pointer active:scale-95"
+                >
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Reset Selected Element Position */}
+                <button
+                  type="button"
+                  title="Resetar Posições do Estúdio"
+                  onClick={() => {
+                    onUpdateAdminConfig({
+                      phonePosX: 0,
+                      phonePosY: 0,
+                      toolbarPosX: 0,
+                      toolbarPosY: 0,
+                      slotLeft: 4,
+                      slotTop: 28,
+                      spinLeft: 50,
+                      spinBottom: 4
+                    });
+                  }}
+                  className="p-2 ml-1 bg-red-950/80 hover:bg-red-600 text-red-300 hover:text-white rounded-lg border border-red-500/30 transition cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

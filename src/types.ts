@@ -126,6 +126,14 @@ export interface AdminConfig {
   bonusForceWinType?: 'none' | 'normal_win' | 'big_win' | 'full_screen'; // force wins during free spins
   bonusMediaUrl?: string; // Image or video URL to play on the Bonus Completed summary screen
 
+  // Phone Viewport Canvas Position
+  phonePosX?: number; // default 0 (%) offset or px
+  phonePosY?: number; // default 0 (%) offset or px
+
+  // Floating Board/Roll Selection Toolbar Position
+  toolbarPosX?: number; // default 0 (%) offset or px
+  toolbarPosY?: number; // default 0 (%) offset or px
+
   // Element Toggle & Theme Configurations
   showHeader?: boolean;
   showBalance?: boolean;
