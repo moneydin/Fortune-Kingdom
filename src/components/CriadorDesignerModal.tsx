@@ -2061,25 +2061,25 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
 
                 {/* 4 Corner handles for Slot Resizing */}
                 {nudgeTarget === 'slot' && (
-                  <div className="absolute inset-0 border-2 border-dashed border-yellow-400 pointer-events-none rounded-2xl z-40">
+                  <div className="absolute -inset-3 border-2 border-dashed border-yellow-400 pointer-events-none rounded-2xl z-40">
                     <div 
                       onMouseDown={(e) => handleStartResize('slot', 'tl', e)}
-                      className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 hover:bg-white active:bg-yellow-300 transition z-50 shadow-md"
+                      className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
                       title="Arrastar para Redimensionar"
                     />
                     <div 
                       onMouseDown={(e) => handleStartResize('slot', 'tr', e)}
-                      className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 hover:bg-white active:bg-yellow-300 transition z-50 shadow-md"
+                      className="absolute -top-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
                       title="Arrastar para Redimensionar"
                     />
                     <div 
                       onMouseDown={(e) => handleStartResize('slot', 'bl', e)}
-                      className="absolute -bottom-1.5 -left-1.5 w-3.5 h-3.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 hover:bg-white active:bg-yellow-300 transition z-50 shadow-md"
+                      className="absolute -bottom-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
                       title="Arrastar para Redimensionar"
                     />
                     <div 
                       onMouseDown={(e) => handleStartResize('slot', 'br', e)}
-                      className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 hover:bg-white active:bg-yellow-300 transition z-50 shadow-md"
+                      className="absolute -bottom-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
                       title="Arrastar para Redimensionar"
                     />
                   </div>
@@ -2136,22 +2136,26 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
 
                 {/* Corner Resizing Handles */}
                 {nudgeTarget === 'spin' && (
-                  <div className="absolute -inset-2 border-2 border-dashed border-yellow-400 pointer-events-none rounded-full z-40">
+                  <div className="absolute -inset-3 border-2 border-dashed border-yellow-400 pointer-events-none rounded-lg z-40">
                     <div 
                       onMouseDown={(e) => handleStartResize('spin', 'tl', e)}
-                      className="absolute -top-1 -left-1 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md"
+                      className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                      title="Arrastar para Redimensionar"
                     />
                     <div 
                       onMouseDown={(e) => handleStartResize('spin', 'tr', e)}
-                      className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md"
+                      className="absolute -top-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                      title="Arrastar para Redimensionar"
                     />
                     <div 
                       onMouseDown={(e) => handleStartResize('spin', 'bl', e)}
-                      className="absolute -bottom-1 -left-1 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md"
+                      className="absolute -bottom-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                      title="Arrastar para Redimensionar"
                     />
                     <div 
                       onMouseDown={(e) => handleStartResize('spin', 'br', e)}
-                      className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md"
+                      className="absolute -bottom-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                      title="Arrastar para Redimensionar"
                     />
                   </div>
                 )}
@@ -2172,9 +2176,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                     left: `${btn.posX}%`,
                     transform: `translate(-50%, -50%) scale(${btn.scale / 100})`,
                   }}
-                  className={`z-30 cursor-move px-3 py-1.5 rounded-full text-xs font-black text-black shadow-lg border border-amber-300 flex items-center gap-1.5 ${btn.bgColor} ${
-                    nudgeTarget === `button-${btn.id}` ? 'ring-2 ring-yellow-400 ring-offset-2 ring-offset-black' : ''
-                  }`}
+                  className={`z-30 cursor-move px-3 py-1.5 rounded-full text-xs font-black text-black shadow-lg border border-amber-300 flex items-center gap-1.5 ${btn.bgColor}`}
                 >
                   {btn.imageUrl && (
                     <img src={btn.imageUrl} alt={btn.label} className="w-4 h-4 object-contain rounded" />
@@ -2183,22 +2185,26 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
 
                   {/* Resizing handles */}
                   {nudgeTarget === `button-${btn.id}` && (
-                    <div className="absolute -inset-1.5 border-2 border-dashed border-yellow-400 pointer-events-none rounded-full z-40">
+                    <div className="absolute -inset-3 border-2 border-dashed border-yellow-400 pointer-events-none rounded-lg z-40">
                       <div 
                         onMouseDown={(e) => handleStartResize(`button-${btn.id}`, 'tl', e)}
-                        className="absolute -top-1 -left-1 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md"
+                        className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                        title="Arrastar para Redimensionar"
                       />
                       <div 
                         onMouseDown={(e) => handleStartResize(`button-${btn.id}`, 'tr', e)}
-                        className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md"
+                        className="absolute -top-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                        title="Arrastar para Redimensionar"
                       />
                       <div 
                         onMouseDown={(e) => handleStartResize(`button-${btn.id}`, 'bl', e)}
-                        className="absolute -bottom-1 -left-1 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md"
+                        className="absolute -bottom-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                        title="Arrastar para Redimensionar"
                       />
                       <div 
                         onMouseDown={(e) => handleStartResize(`button-${btn.id}`, 'br', e)}
-                        className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md"
+                        className="absolute -bottom-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                        title="Arrastar para Redimensionar"
                       />
                     </div>
                   )}
@@ -2222,32 +2228,34 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                     fontSize: `${txt.fontSize}px`,
                     color: txt.color,
                   }}
-                  className={`z-30 cursor-move font-black tracking-wider uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] px-1 ${
-                    nudgeTarget === `text-${txt.id}` ? 'outline outline-2 outline-dashed outline-yellow-400 outline-offset-4 rounded' : ''
-                  }`}
+                  className="z-30 cursor-move font-black tracking-wider uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] px-1 relative"
                 >
                   {txt.text}
 
                   {/* Resizing handles */}
                   {nudgeTarget === `text-${txt.id}` && (
-                    <>
+                    <div className="absolute -inset-3 border-2 border-dashed border-yellow-400 pointer-events-none rounded-lg z-40">
                       <div 
                         onMouseDown={(e) => handleStartResize(`text-${txt.id}`, 'tl', e)}
-                        className="absolute -top-2.5 -left-2.5 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md"
+                        className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                        title="Arrastar para Redimensionar"
                       />
                       <div 
                         onMouseDown={(e) => handleStartResize(`text-${txt.id}`, 'tr', e)}
-                        className="absolute -top-2.5 -right-2.5 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md"
+                        className="absolute -top-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                        title="Arrastar para Redimensionar"
                       />
                       <div 
                         onMouseDown={(e) => handleStartResize(`text-${txt.id}`, 'bl', e)}
-                        className="absolute -bottom-2.5 -left-2.5 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md"
+                        className="absolute -bottom-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                        title="Arrastar para Redimensionar"
                       />
                       <div 
                         onMouseDown={(e) => handleStartResize(`text-${txt.id}`, 'br', e)}
-                        className="absolute -bottom-2.5 -right-2.5 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md"
+                        className="absolute -bottom-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                        title="Arrastar para Redimensionar"
                       />
-                    </>
+                    </div>
                   )}
                 </div>
               ))}
