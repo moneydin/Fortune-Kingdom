@@ -1179,13 +1179,13 @@ export default function App() {
             disabled={gameState.isSpinning}
             style={{
               position: 'absolute',
-              top: '71%',
-              left: '50%',
-              transform: 'translateX(-50%)',
+              top: `${adminConfig.buyBonusPosY ?? 71}%`,
+              left: `${adminConfig.buyBonusPosX ?? 50}%`,
+              transform: `translate(-50%, -50%) scale(${(adminConfig.buyBonusScale ?? 100) / 100})`,
             }}
             className="z-20 px-4 py-1.5 bg-gradient-to-r from-yellow-500 via-amber-500 to-yellow-600 hover:from-yellow-400 hover:to-amber-400 text-black font-black text-[10px] sm:text-xs rounded-full shadow-[0_4px_15px_rgba(245,158,11,0.4)] hover:shadow-yellow-400/30 active:scale-95 transition pointer-events-auto cursor-pointer animate-pulse whitespace-nowrap uppercase tracking-wider border border-yellow-300"
           >
-            ⭐ Comprar Bônus (x{adminConfig.buyBonusMultiplier ?? 50})
+            {(adminConfig.buyBonusLabel ?? "⭐ Comprar Bônus (x{multiplier})").replace('{multiplier}', String(adminConfig.buyBonusMultiplier ?? 50))}
           </button>
         )}
 

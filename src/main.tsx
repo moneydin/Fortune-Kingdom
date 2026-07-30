@@ -13,17 +13,23 @@ window.addEventListener('unhandledrejection', (event) => {
     reason.toLowerCase().includes('user rejected')
   ) {
     event.preventDefault();
+    event.stopPropagation();
     console.warn('Suppressed third-party extension error:', reason);
   }
-});
+}, true);
 
 window.addEventListener('error', (event) => {
   const msg = event.message?.toLowerCase() || '';
-  if (msg.includes('metamask') || msg.includes('ethereum') || msg.includes('wallet')) {
+  const errorMsg = event.error?.message?.toLowerCase() || '';
+  if (
+    msg.includes('metamask') || msg.includes('ethereum') || msg.includes('wallet') ||
+    errorMsg.includes('metamask') || errorMsg.includes('ethereum') || errorMsg.includes('wallet')
+  ) {
     event.preventDefault();
-    console.warn('Suppressed third-party extension window error:', event.message);
+    event.stopPropagation();
+    console.warn('Suppressed third-party extension window error:', event.message || event.error?.message);
   }
-});
+}, true);
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;

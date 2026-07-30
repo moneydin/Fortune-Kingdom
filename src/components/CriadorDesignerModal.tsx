@@ -85,6 +85,8 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
 
   // Phone viewport scale & presets
   const [phoneWidth, setPhoneWidth] = useState<number>(360);
+  const [toolbarWidth, setToolbarWidth] = useState<number>(440);
+  const [toolbarTab, setToolbarTab] = useState<'board' | 'layout' | 'size'>('board');
   const [showGridLines, setShowGridLines] = useState<boolean>(true);
   const [dragPrecisionMode, setDragPrecisionMode] = useState<'fine' | 'normal'>('fine');
 
@@ -133,6 +135,8 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
       startHeight = adminConfig.slotHeight ?? 38;
     } else if (target === 'spin') {
       startScale = adminConfig.spinScale ?? 100;
+    } else if (target === 'buyBonus') {
+      startScale = adminConfig.buyBonusScale ?? 100;
     } else if (target.startsWith('button-')) {
       const btnId = target.replace('button-', '');
       const btn = (adminConfig.customButtons || []).find(b => b.id === btnId);
@@ -154,7 +158,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
   };
 
   // Pixel Precision Nudge State
-  const [nudgeTarget, setNudgeTarget] = useState<'phone' | 'toolbar' | 'slot' | 'spin'>('phone');
+  const [nudgeTarget, setNudgeTarget] = useState<string | null>('phone');
   const [nudgeStep, setNudgeStep] = useState<number>(1); // 1px, 5px, 10px
 
   const handleNudge = (dirX: number, dirY: number) => {
@@ -176,6 +180,89 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
       const curY = adminConfig.spinBottom ?? 4;
       const pctStep = nudgeStep === 1 ? 0.5 : nudgeStep;
       onUpdateAdminConfig({ spinLeft: roundPrecision(curX + dirX * pctStep), spinBottom: roundPrecision(curY - dirY * pctStep) });
+    } else if (nudgeTarget === 'buyBonus') {
+      const curX = adminConfig.buyBonusPosX ?? 50;
+      const curY = adminConfig.buyBonusPosY ?? 71;
+      const pctStep = nudgeStep === 1 ? 0.5 : nudgeStep;
+      onUpdateAdminConfig({ buyBonusPosX: roundPrecision(curX + dirX * pctStep), buyBonusPosY: roundPrecision(curY + dirY * pctStep) });
+    } else if (nudgeTarget?.startsWith('button-')) {
+      const btnId = nudgeTarget.replace('button-', '');
+      const btn = (adminConfig.customButtons || []).find(b => b.id === btnId);
+      if (btn) {
+        const pctStep = nudgeStep === 1 ? 0.5 : nudgeStep;
+        const updatedButtons = (adminConfig.customButtons || []).map(b =>
+          b.id === btnId ? { ...b, posX: roundPrecision(b.posX + dirX * pctStep), posY: roundPrecision(b.posY + pctStep * dirY) } : b
+        );
+        onUpdateAdminConfig({ customButtons: updatedButtons });
+      }
+    } else if (nudgeTarget?.startsWith('text-')) {
+      const textId = nudgeTarget.replace('text-', '');
+      const txt = (adminConfig.customTexts || []).find(t => t.id === textId);
+      if (txt) {
+        const pctStep = nudgeStep === 1 ? 0.5 : nudgeStep;
+        const updatedTexts = (adminConfig.customTexts || []).map(t =>
+          t.id === textId ? { ...t, posX: roundPrecision(t.posX + dirX * pctStep), posY: roundPrecision(t.posY + pctStep * dirY) } : t
+        );
+        onUpdateAdminConfig({ customTexts: updatedTexts });
+      }
+    }
+  };
+
+  const handleCenterTarget = (axis: 'x' | 'y' | 'both') => {
+    const alignX = axis === 'x' || axis === 'both';
+    const alignY = axis === 'y' || axis === 'both';
+
+    if (nudgeTarget === 'phone') {
+      onUpdateAdminConfig({
+        ...(alignX && { phonePosX: 0 }),
+        ...(alignY && { phonePosY: 0 }),
+      });
+    } else if (nudgeTarget === 'toolbar') {
+      onUpdateAdminConfig({
+        ...(alignX && { toolbarPosX: 0 }),
+        ...(alignY && { toolbarPosY: 0 }),
+      });
+    } else if (nudgeTarget === 'slot') {
+      onUpdateAdminConfig({
+        ...(alignX && { slotLeft: roundPrecision((100 - (adminConfig.slotWidth ?? 92)) / 2) }),
+        ...(alignY && { slotTop: roundPrecision((100 - (adminConfig.slotHeight ?? 38)) / 2) }),
+      });
+    } else if (nudgeTarget === 'spin') {
+      onUpdateAdminConfig({
+        ...(alignX && { spinLeft: 50 }),
+        ...(alignY && { spinBottom: 4 }),
+      });
+    } else if (nudgeTarget === 'buyBonus') {
+      onUpdateAdminConfig({
+        ...(alignX && { buyBonusPosX: 50 }),
+        ...(alignY && { buyBonusPosY: 71 }),
+      });
+    } else if (nudgeTarget?.startsWith('button-')) {
+      const btnId = nudgeTarget.replace('button-', '');
+      const updatedButtons = (adminConfig.customButtons || []).map(b => {
+        if (b.id === btnId) {
+          return {
+            ...b,
+            ...(alignX && { posX: 50 }),
+            ...(alignY && { posY: 50 }),
+          };
+        }
+        return b;
+      });
+      onUpdateAdminConfig({ customButtons: updatedButtons });
+    } else if (nudgeTarget?.startsWith('text-')) {
+      const textId = nudgeTarget.replace('text-', '');
+      const updatedTexts = (adminConfig.customTexts || []).map(t => {
+        if (t.id === textId) {
+          return {
+            ...t,
+            ...(alignX && { posX: 50 }),
+            ...(alignY && { posY: 50 }),
+          };
+        }
+        return t;
+      });
+      onUpdateAdminConfig({ customTexts: updatedTexts });
     }
   };
 
@@ -301,6 +388,10 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
         const factorX = (resizeHandle === 'tr' || resizeHandle === 'br') ? 1 : -1;
         const newSpinScale = Math.max(40, Math.min(250, Math.round(resizeStartRef.current.startScale + deltaX * factorX * 0.8)));
         onUpdateAdminConfig({ spinScale: newSpinScale });
+      } else if (resizingTarget === 'buyBonus') {
+        const factorX = (resizeHandle === 'tr' || resizeHandle === 'br') ? 1 : -1;
+        const newBuyBonusScale = Math.max(40, Math.min(250, Math.round(resizeStartRef.current.startScale + deltaX * factorX * 0.8)));
+        onUpdateAdminConfig({ buyBonusScale: newBuyBonusScale });
       } else if (resizingTarget.startsWith('button-')) {
         const btnId = resizingTarget.replace('button-', '');
         const factorX = (resizeHandle === 'tr' || resizeHandle === 'br') ? 1 : -1;
@@ -345,6 +436,8 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
       onUpdateAdminConfig({ slotLeft: newX, slotTop: newY });
     } else if (draggingTarget === 'spin') {
       onUpdateAdminConfig({ spinLeft: newX, spinBottom: 100 - newY });
+    } else if (draggingTarget === 'buyBonus') {
+      onUpdateAdminConfig({ buyBonusPosX: newX, buyBonusPosY: newY });
     } else if (draggingTarget === 'balance') {
       onUpdateAdminConfig({ balancePosX: newX, balancePosY: newY });
     } else if (draggingTarget === 'bet') {
@@ -667,8 +760,8 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                 activeTab === 'engine' ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-lg' : 'text-gray-400 hover:bg-white/5'
               }`}
             >
-              <Settings className="w-4 h-4" />
-              <span className="text-[9px]">2. Motor & Regras</span>
+              <LayoutGrid className="w-4 h-4 text-amber-300" />
+              <span className="text-[9px] font-black">2. Editar Slot</span>
             </button>
 
             <button
@@ -1248,6 +1341,69 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                         />
                       </div>
                     </div>
+
+                    {/* Advanced Bonus Settings */}
+                    <div className="pt-2 border-t border-white/10 space-y-2.5">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] text-gray-300 font-bold block mb-1">
+                            Boost Multiplicador no Bônus:
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="10"
+                            step="0.5"
+                            value={adminConfig.bonusMultiplierBoost ?? 2}
+                            onChange={(e) => onUpdateAdminConfig({ bonusMultiplierBoost: parseFloat(e.target.value) || 2 })}
+                            className="w-full px-2 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-yellow-300 font-mono font-bold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] text-gray-300 font-bold block mb-1">
+                            Ganho Instantâneo no Acionamento:
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={adminConfig.bonusInstantPayMultiplier ?? 5}
+                            onChange={(e) => onUpdateAdminConfig({ bonusInstantPayMultiplier: parseInt(e.target.value) || 0 })}
+                            className="w-full px-2 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-emerald-300 font-mono font-bold"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-gray-300 font-bold block mb-1">
+                          Comportamento / Forçar Ganhos no Bônus:
+                        </label>
+                        <select
+                          value={adminConfig.bonusForceWinType || 'none'}
+                          onChange={(e) => onUpdateAdminConfig({ bonusForceWinType: e.target.value as any })}
+                          className="w-full px-2.5 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-amber-300 font-bold focus:outline-none cursor-pointer"
+                        >
+                          <option value="none">Resultado Natural (Sem Forçar)</option>
+                          <option value="normal_win">Forçar Ganhos Normais Constantes</option>
+                          <option value="big_win">Forçar Sempre Big Wins!</option>
+                          <option value="full_screen">Forçar Sempre Tela Cheia de Símbolos!</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-gray-300 font-bold block mb-1">
+                          Mídia do Encerramento do Bônus (Vídeo ou Imagem):
+                        </label>
+                        <input
+                          type="text"
+                          value={adminConfig.bonusMediaUrl ?? ''}
+                          onChange={(e) => onUpdateAdminConfig({ bonusMediaUrl: e.target.value })}
+                          placeholder="Link da imagem/vídeo exibido no final"
+                          className="w-full px-2.5 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-white font-mono"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1723,6 +1879,122 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                   </div>
                 </div>
 
+                {/* Buy Bonus Button Configuration Area */}
+                <div className="bg-gradient-to-r from-amber-950/40 via-black to-amber-950/40 p-3.5 rounded-xl border border-yellow-500/40 space-y-3">
+                  <h3 className="text-xs font-black text-yellow-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                    <span>Configuração do Botão Comprar Bônus</span>
+                  </h3>
+
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-2 p-2 bg-black/70 rounded-lg border border-white/10 cursor-pointer hover:border-yellow-500/50 transition">
+                      <input
+                        type="checkbox"
+                        checked={adminConfig.enableBuyBonus !== false}
+                        onChange={(e) => onUpdateAdminConfig({ enableBuyBonus: e.target.checked })}
+                        className="w-4 h-4 accent-yellow-500 rounded cursor-pointer"
+                      />
+                      <span className="text-xs text-gray-200 font-bold">
+                        Habilitar Botão de Comprar Bônus no Jogo
+                      </span>
+                    </label>
+
+                    {adminConfig.enableBuyBonus !== false && (
+                      <>
+                        <div>
+                          <label className="text-[10px] text-gray-300 font-bold block mb-1">
+                            Preço do Bônus (Multiplicador de Aposta, ex: 50x ou 100x):
+                          </label>
+                          <input
+                            type="number"
+                            min="5"
+                            max="500"
+                            value={adminConfig.buyBonusMultiplier ?? 50}
+                            onChange={(e) => onUpdateAdminConfig({ buyBonusMultiplier: parseInt(e.target.value) || 50 })}
+                            className="w-full px-2.5 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-yellow-300 font-mono font-bold"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] text-gray-300 font-bold block mb-1">
+                            Texto / Label do Botão:
+                          </label>
+                          <input
+                            type="text"
+                            value={adminConfig.buyBonusLabel ?? "⭐ Comprar Bônus (x{multiplier})"}
+                            onChange={(e) => onUpdateAdminConfig({ buyBonusLabel: e.target.value })}
+                            placeholder="Use {multiplier} para mostrar o preço"
+                            className="w-full px-2.5 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-white"
+                          />
+                          <p className="text-[8px] text-gray-400 mt-0.5">
+                            Use o texto <code className="text-yellow-400">{`{multiplier}`}</code> para inserir dinamicamente o custo selecionado.
+                          </p>
+                        </div>
+
+                        {/* Position X and Y, and Scale */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <div className="flex justify-between text-[10px] text-gray-300 font-bold mb-1">
+                              <span>Posição X (%):</span>
+                              <span className="text-amber-300 font-mono">{adminConfig.buyBonusPosX ?? 50}%</span>
+                            </div>
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              step="0.5"
+                              value={adminConfig.buyBonusPosX ?? 50}
+                              onChange={(e) => onUpdateAdminConfig({ buyBonusPosX: parseFloat(e.target.value) })}
+                              className="w-full accent-amber-500 cursor-pointer h-1.5"
+                            />
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between text-[10px] text-gray-300 font-bold mb-1">
+                              <span>Posição Y (%):</span>
+                              <span className="text-amber-300 font-mono">{adminConfig.buyBonusPosY ?? 71}%</span>
+                            </div>
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              step="0.5"
+                              value={adminConfig.buyBonusPosY ?? 71}
+                              onChange={(e) => onUpdateAdminConfig({ buyBonusPosY: parseFloat(e.target.value) })}
+                              className="w-full accent-amber-500 cursor-pointer h-1.5"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between text-[10px] text-gray-300 font-bold mb-1">
+                            <span>Tamanho do Botão (%):</span>
+                            <span className="text-amber-300 font-mono">{adminConfig.buyBonusScale ?? 100}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="40"
+                            max="250"
+                            value={adminConfig.buyBonusScale ?? 100}
+                            onChange={(e) => onUpdateAdminConfig({ buyBonusScale: parseInt(e.target.value) })}
+                            className="w-full accent-amber-500 cursor-pointer h-1.5"
+                          />
+                        </div>
+
+                        {/* Interactive Drag Hint */}
+                        <button
+                          type="button"
+                          onClick={() => setNudgeTarget('buyBonus')}
+                          className="w-full py-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 rounded-lg text-[10px] font-extrabold uppercase flex items-center justify-center gap-1"
+                        >
+                          <Move className="w-3.5 h-3.5" />
+                          <span>Selecionar p/ Ajustar na Tela</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+
                 {/* List of Created Custom Buttons */}
                 <div className="space-y-2">
                   <h4 className="text-[11px] font-black text-gray-300 uppercase tracking-wider">
@@ -1860,24 +2132,27 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
           {/* Preview Control Header: Tabuleiro e Rolagem Selector Bar (Draggable) */}
           <div 
             style={{
+              width: `${toolbarWidth}px`,
+              maxWidth: '95vw',
               transform: `translate(${adminConfig.toolbarPosX ?? 0}px, ${adminConfig.toolbarPosY ?? 0}px)`
             }}
-            className="w-full max-w-[440px] bg-black/90 backdrop-blur-md border border-amber-500/40 rounded-2xl p-2.5 mb-3 shadow-[0_0_35px_rgba(245,158,11,0.2)] z-30 space-y-2 select-none relative transition-transform duration-75"
+            className="bg-black/95 backdrop-blur-md border-2 border-amber-500/60 rounded-2xl p-3 mb-3 shadow-[0_0_35px_rgba(245,158,11,0.35)] z-30 space-y-2.5 select-none relative transition-all duration-75"
           >
+            {/* Header: Draggable Grip and Reset */}
             <div 
               onMouseDown={(e) => handleStartDrag('toolbar', adminConfig.toolbarPosX ?? 0, adminConfig.toolbarPosY ?? 0, e.clientX, e.clientY)}
-              className="flex items-center justify-between border-b border-white/10 pb-1.5 cursor-grab active:cursor-grabbing hover:bg-white/5 px-1 py-0.5 rounded-lg transition"
+              className="flex items-center justify-between border-b border-white/10 pb-1.5 cursor-grab active:cursor-grabbing hover:bg-white/5 px-1.5 py-1 rounded-lg transition"
             >
               <div className="flex items-center gap-1.5">
                 <GripHorizontal className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
                 <span className="text-[11px] font-black uppercase text-amber-300 tracking-wider">
-                  Ferramenta de Tabuleiro ({activeBoardType})
+                  Ferramenta de Ajustes Gerais
                 </span>
               </div>
 
               <div className="flex items-center gap-1.5">
-                <span className="text-[9px] font-mono text-gray-300 bg-black/60 px-1.5 py-0.5 rounded border border-white/10">
-                  X: {adminConfig.toolbarPosX ?? 0}px | Y: {adminConfig.toolbarPosY ?? 0}px
+                <span className="text-[9px] font-mono text-gray-300 bg-neutral-900 px-1.5 py-0.5 rounded border border-white/10">
+                  X:{adminConfig.toolbarPosX ?? 0}px | Y:{adminConfig.toolbarPosY ?? 0}px
                 </span>
                 {(adminConfig.toolbarPosX !== 0 || adminConfig.toolbarPosY !== 0) && (
                   <button
@@ -1892,58 +2167,427 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
               </div>
             </div>
 
-            {/* Fast Swap Board Pills */}
-            <div>
-              <div className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center justify-between">
-                <span>Trocar Tabuleiro Ativo no Preview:</span>
-                <span className="text-amber-400 font-mono text-[8px]">Clique p/ alternar</span>
-              </div>
-              <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none">
-                {BOARD_OPTIONS.map((b) => (
-                  <button
-                    key={b.id}
-                    type="button"
-                    onClick={() => {
-                      onUpdateAdminConfig({ boardType: b.id });
-                      if (engineConfig && onUpdateEngineConfig) {
-                        onUpdateEngineConfig({ ...engineConfig, boardType: b.id });
-                      }
-                    }}
-                    className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold shrink-0 border transition cursor-pointer ${
-                      activeBoardType === b.id
-                        ? 'bg-gradient-to-r from-red-600 via-amber-600 to-yellow-500 text-white border-yellow-300 shadow-md scale-105'
-                        : 'bg-neutral-900/90 text-gray-300 border-white/10 hover:border-amber-400/50 hover:text-amber-300'
-                    }`}
-                  >
-                    {b.id}
-                  </button>
-                ))}
-              </div>
+            {/* Sub-tabs system within the Tool Board */}
+            <div className="grid grid-cols-3 gap-1 bg-neutral-950 p-1 rounded-lg border border-white/5">
+              <button
+                type="button"
+                onClick={() => setToolbarTab('board')}
+                className={`py-1 text-[10px] font-black rounded transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                  toolbarTab === 'board' ? 'bg-amber-500 text-black shadow-md' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <span>🎰</span>
+                <span>Motor</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setToolbarTab('layout')}
+                className={`py-1 text-[10px] font-black rounded transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                  toolbarTab === 'layout' ? 'bg-amber-500 text-black shadow-md' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <span>🎯</span>
+                <span>Alinhamento</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setToolbarTab('size')}
+                className={`py-1 text-[10px] font-black rounded transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                  toolbarTab === 'size' ? 'bg-amber-500 text-black shadow-md' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <span>📐</span>
+                <span>Tamanho</span>
+              </button>
             </div>
 
-            {/* Fast Swap Spin Roll Style Pills */}
-            <div className="pt-1.5 border-t border-white/10">
-              <div className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-                <span>Efeito de Rolagem dos Rolos:</span>
+            {/* SUB-TAB Content: BOARD */}
+            {toolbarTab === 'board' && (
+              <div className="space-y-2.5 animate-in fade-in duration-150">
+                {/* Fast Swap Board Pills */}
+                <div>
+                  <div className="text-[9px] font-black text-amber-400 uppercase tracking-widest mb-1 flex items-center justify-between">
+                    <span>Selecionar Tabuleiro Ativo:</span>
+                    <span className="text-gray-500 font-mono text-[8px]">{activeBoardType}</span>
+                  </div>
+                  <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-white/10">
+                    {BOARD_OPTIONS.map((b) => (
+                      <button
+                        key={b.id}
+                        type="button"
+                        onClick={() => {
+                          onUpdateAdminConfig({ boardType: b.id });
+                          if (engineConfig && onUpdateEngineConfig) {
+                            onUpdateEngineConfig({ ...engineConfig, boardType: b.id });
+                          }
+                        }}
+                        className={`px-2 py-1 rounded-md text-[10px] font-extrabold shrink-0 border transition cursor-pointer ${
+                          activeBoardType === b.id
+                            ? 'bg-gradient-to-r from-red-600 to-amber-500 text-white border-yellow-300 shadow scale-105'
+                            : 'bg-neutral-900 text-gray-300 border-white/5 hover:border-amber-400/50 hover:text-amber-300'
+                        }`}
+                      >
+                        {b.id}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Fast Swap Spin Roll Style Pills */}
+                <div className="pt-1.5 border-t border-white/10">
+                  <div className="text-[9px] font-black text-amber-400 uppercase tracking-widest mb-1 flex items-center justify-between">
+                    <span>Rolagem dos Rolos:</span>
+                    <span className="text-gray-500 font-mono text-[8px]">{activeRollStyle.label}</span>
+                  </div>
+                  <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-thin scrollbar-thumb-white/10">
+                    {SPIN_ROLL_STYLES.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => onUpdateAdminConfig({ spinRollStyle: s.id })}
+                        className={`px-2 py-0.5 rounded-full text-[9px] font-black shrink-0 border transition cursor-pointer flex items-center gap-1 ${
+                          (adminConfig.spinRollStyle || 'standard') === s.id
+                            ? 'bg-amber-400 text-black border-yellow-200 shadow scale-105'
+                            : 'bg-neutral-900 text-gray-400 border-white/5 hover:text-white'
+                        }`}
+                      >
+                        <span>{s.icon}</span>
+                        <span>{s.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-none">
-                {SPIN_ROLL_STYLES.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => onUpdateAdminConfig({ spinRollStyle: s.id })}
-                    className={`px-2 py-0.5 rounded-full text-[9px] font-black shrink-0 border transition cursor-pointer flex items-center gap-1 ${
-                      (adminConfig.spinRollStyle || 'standard') === s.id
-                        ? 'bg-amber-400 text-black border-yellow-200 shadow-sm scale-105'
-                        : 'bg-neutral-900 text-gray-400 border-white/10 hover:text-white'
-                    }`}
+            )}
+
+            {/* SUB-TAB Content: LAYOUT (ALIGNMENT & DIRECTIONAL COORDS) */}
+            {toolbarTab === 'layout' && (
+              <div className="space-y-3 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between gap-2 bg-neutral-950 p-1.5 rounded-lg border border-white/5">
+                  <span className="text-[10px] font-black uppercase text-gray-400">Elemento Focado:</span>
+                  <select
+                    value={nudgeTarget || 'phone'}
+                    onChange={(e) => setNudgeTarget(e.target.value as any)}
+                    className="bg-neutral-900 border border-white/10 text-amber-300 font-bold text-[10px] px-2 py-1 rounded cursor-pointer focus:outline-none"
                   >
-                    <span>{s.icon}</span>
-                    <span>{s.label}</span>
-                  </button>
-                ))}
+                    <option value="phone">📱 Celular (Fundo)</option>
+                    <option value="slot">🎰 Moldura do Slot</option>
+                    <option value="spin">🔘 Botão de Girar</option>
+                    <option value="buyBonus">⭐ Botão Comprar Bônus</option>
+                    <option value="toolbar">🛠️ Esta Ferramenta</option>
+                    {(adminConfig.customButtons || []).map(b => (
+                      <option key={b.id} value={`button-${b.id}`}>🎨 Botão: {b.label}</option>
+                    ))}
+                    {(adminConfig.customTexts || []).map(t => (
+                      <option key={t.id} value={`text-${t.id}`}>📝 Texto: {t.text.substring(0,10)}...</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 items-center">
+                  {/* Left Side: Directional Arrows Nudge D-pad */}
+                  <div className="flex flex-col items-center">
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Ajustar Posição</span>
+                    <div className="grid grid-cols-3 gap-1 w-24 h-24 relative bg-neutral-900/50 p-1.5 rounded-xl border border-white/5">
+                      <div />
+                      <button
+                        type="button"
+                        onClick={() => handleNudge(0, -1)}
+                        className="bg-neutral-800 hover:bg-amber-400 hover:text-black text-gray-200 font-black rounded-lg flex items-center justify-center transition active:scale-90 cursor-pointer border border-white/5"
+                        title="Mover para Cima"
+                      >
+                        <ArrowUp className="w-3.5 h-3.5" />
+                      </button>
+                      <div />
+
+                      <button
+                        type="button"
+                        onClick={() => handleNudge(-1, 0)}
+                        className="bg-neutral-800 hover:bg-amber-400 hover:text-black text-gray-200 font-black rounded-lg flex items-center justify-center transition active:scale-90 cursor-pointer border border-white/5"
+                        title="Mover para Esquerda"
+                      >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                      </button>
+                      <div className="bg-neutral-950 flex items-center justify-center rounded text-[9px] font-black font-mono text-amber-300 border border-white/10">
+                        {nudgeStep}px
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleNudge(1, 0)}
+                        className="bg-neutral-800 hover:bg-amber-400 hover:text-black text-gray-200 font-black rounded-lg flex items-center justify-center transition active:scale-90 cursor-pointer border border-white/5"
+                        title="Mover para Direita"
+                      >
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+
+                      <div />
+                      <button
+                        type="button"
+                        onClick={() => handleNudge(0, 1)}
+                        className="bg-neutral-800 hover:bg-amber-400 hover:text-black text-gray-200 font-black rounded-lg flex items-center justify-center transition active:scale-90 cursor-pointer border border-white/5"
+                        title="Mover para Baixo"
+                      >
+                        <ArrowDown className="w-3.5 h-3.5" />
+                      </button>
+                      <div />
+                    </div>
+                  </div>
+
+                  {/* Right Side: Step and Center presets */}
+                  <div className="space-y-2">
+                    <div>
+                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Passo</span>
+                      <div className="grid grid-cols-3 gap-0.5 bg-neutral-950 p-0.5 rounded border border-white/5">
+                        {[1, 5, 10].map((step) => (
+                          <button
+                            key={step}
+                            type="button"
+                            onClick={() => setNudgeStep(step)}
+                            className={`py-0.5 text-[9px] font-black rounded cursor-pointer transition ${
+                              nudgeStep === step ? 'bg-amber-500 text-black' : 'text-gray-400 hover:text-white'
+                            }`}
+                          >
+                            {step}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1 pt-1.5 border-t border-white/5">
+                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Alinhamento</span>
+                      <div className="grid grid-cols-2 gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleCenterTarget('x')}
+                          className="py-1 px-1.5 bg-neutral-900 hover:bg-amber-500 hover:text-black text-[9px] font-black rounded transition text-center cursor-pointer border border-white/5 whitespace-nowrap"
+                          title="Centralizar Horizontalmente"
+                        >
+                          Centrar Horiz.
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleCenterTarget('y')}
+                          className="py-1 px-1.5 bg-neutral-900 hover:bg-amber-500 hover:text-black text-[9px] font-black rounded transition text-center cursor-pointer border border-white/5 whitespace-nowrap"
+                          title="Centralizar Verticalmente"
+                        >
+                          Centrar Vert.
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* SUB-TAB Content: SIZES & OTHER SETTINGS */}
+            {toolbarTab === 'size' && (
+              <div className="space-y-2.5 animate-in fade-in duration-150 text-xs">
+                {/* 1. Celular Width */}
+                <div>
+                  <div className="flex justify-between text-[10px] text-gray-300 font-bold mb-1">
+                    <span className="flex items-center gap-1 text-amber-400">
+                      <Smartphone className="w-3 h-3" />
+                      <span>Largura do Celular (Preview):</span>
+                    </span>
+                    <span className="text-amber-300 font-mono font-black">{phoneWidth}px</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min={240}
+                      max={650}
+                      step={10}
+                      value={phoneWidth}
+                      onChange={(e) => setPhoneWidth(parseInt(e.target.value) || 360)}
+                      className="flex-1 accent-amber-500 cursor-pointer h-1.5 bg-neutral-800 rounded-lg"
+                    />
+                    <div className="flex gap-0.5">
+                      {[320, 360, 420].map((w) => (
+                        <button
+                          key={w}
+                          type="button"
+                          onClick={() => setPhoneWidth(w)}
+                          className={`px-1 py-0.5 rounded text-[8px] font-black cursor-pointer transition ${
+                            phoneWidth === w ? 'bg-amber-400 text-black' : 'bg-neutral-800 text-gray-300'
+                          }`}
+                        >
+                          {w}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Tool Board Width */}
+                <div className="pt-1.5 border-t border-white/10">
+                  <div className="flex justify-between text-[10px] text-gray-300 font-bold mb-1">
+                    <span className="flex items-center gap-1 text-amber-400">
+                      <Maximize2 className="w-3 h-3" />
+                      <span>Largura deste Painel:</span>
+                    </span>
+                    <span className="text-amber-300 font-mono font-black">{toolbarWidth}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={340}
+                    max={720}
+                    step={10}
+                    value={toolbarWidth}
+                    onChange={(e) => setToolbarWidth(parseInt(e.target.value) || 440)}
+                    className="w-full accent-amber-500 cursor-pointer h-1.5 bg-neutral-800 rounded-lg"
+                  />
+                </div>
+
+                {/* 3. Selected Target Width/Height/Scale Sliders */}
+                {nudgeTarget && (
+                  <div className="pt-2 border-t border-white/10 bg-neutral-950 p-2 rounded-lg border border-white/5 space-y-2">
+                    <span className="text-[9px] font-black uppercase text-amber-300 block">
+                      Ajustar Dimensões de: <b className="text-white">{nudgeTarget}</b>
+                    </span>
+
+                    {/* If selected target is SLOT */}
+                    {nudgeTarget === 'slot' && (
+                      <div className="space-y-1.5">
+                        <div>
+                          <div className="flex justify-between text-[9px] text-gray-300 font-bold">
+                            <span>Largura do Slot (%):</span>
+                            <span className="text-yellow-400 font-mono">{adminConfig.slotWidth ?? 92}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="30"
+                            max="100"
+                            step="1"
+                            value={adminConfig.slotWidth ?? 92}
+                            onChange={(e) => onUpdateAdminConfig({ slotWidth: parseFloat(e.target.value) })}
+                            className="w-full accent-yellow-400 h-1 cursor-pointer"
+                          />
+                        </div>
+                        <div>
+                          <div className="flex justify-between text-[9px] text-gray-300 font-bold">
+                            <span>Altura do Slot (%):</span>
+                            <span className="text-yellow-400 font-mono">{adminConfig.slotHeight ?? 38}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="15"
+                            max="80"
+                            step="1"
+                            value={adminConfig.slotHeight ?? 38}
+                            onChange={(e) => onUpdateAdminConfig({ slotHeight: parseFloat(e.target.value) })}
+                            className="w-full accent-yellow-400 h-1 cursor-pointer"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* If selected target is SPIN */}
+                    {nudgeTarget === 'spin' && (
+                      <div>
+                        <div className="flex justify-between text-[9px] text-gray-300 font-bold">
+                          <span>Escala do Botão (%):</span>
+                          <span className="text-yellow-400 font-mono">{adminConfig.spinScale ?? 100}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="50"
+                          max="180"
+                          step="5"
+                          value={adminConfig.spinScale ?? 100}
+                          onChange={(e) => onUpdateAdminConfig({ spinScale: parseInt(e.target.value) })}
+                          className="w-full accent-yellow-400 h-1 cursor-pointer"
+                        />
+                      </div>
+                    )}
+
+                    {/* If selected target is BUY BONUS */}
+                    {nudgeTarget === 'buyBonus' && (
+                      <div>
+                        <div className="flex justify-between text-[9px] text-gray-300 font-bold">
+                          <span>Escala do Bônus (%):</span>
+                          <span className="text-yellow-400 font-mono">{adminConfig.buyBonusScale ?? 100}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="50"
+                          max="180"
+                          step="5"
+                          value={adminConfig.buyBonusScale ?? 100}
+                          onChange={(e) => onUpdateAdminConfig({ buyBonusScale: parseInt(e.target.value) })}
+                          className="w-full accent-yellow-400 h-1 cursor-pointer"
+                        />
+                      </div>
+                    )}
+
+                    {/* If selected target is custom button */}
+                    {nudgeTarget?.startsWith('button-') && (
+                      <div>
+                        <div className="flex justify-between text-[9px] text-gray-300 font-bold">
+                          <span>Escala do Botão (%):</span>
+                          {(() => {
+                            const btnId = nudgeTarget.replace('button-', '');
+                            const btn = (adminConfig.customButtons || []).find(b => b.id === btnId);
+                            return (
+                              <>
+                                <span className="text-yellow-400 font-mono">{btn ? btn.scale : 100}%</span>
+                                <input
+                                  type="range"
+                                  min="50"
+                                  max="180"
+                                  step="5"
+                                  value={btn ? btn.scale : 100}
+                                  onChange={(e) => {
+                                    const nextScale = parseInt(e.target.value);
+                                    const updated = (adminConfig.customButtons || []).map(b =>
+                                      b.id === btnId ? { ...b, scale: nextScale } : b
+                                    );
+                                    onUpdateAdminConfig({ customButtons: updated });
+                                  }}
+                                  className="w-full accent-yellow-400 h-1 cursor-pointer"
+                                />
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* If selected target is custom text */}
+                    {nudgeTarget?.startsWith('text-') && (
+                      <div>
+                        <div className="flex justify-between text-[9px] text-gray-300 font-bold">
+                          <span>Tamanho da Fonte (px):</span>
+                          {(() => {
+                            const textId = nudgeTarget.replace('text-', '');
+                            const txt = (adminConfig.customTexts || []).find(t => t.id === textId);
+                            return (
+                              <>
+                                <span className="text-yellow-400 font-mono">{txt ? txt.fontSize : 14}px</span>
+                                <input
+                                  type="range"
+                                  min="8"
+                                  max="48"
+                                  step="1"
+                                  value={txt ? txt.fontSize : 14}
+                                  onChange={(e) => {
+                                    const nextSize = parseInt(e.target.value);
+                                    const updated = (adminConfig.customTexts || []).map(t =>
+                                      t.id === textId ? { ...t, fontSize: nextSize } : t
+                                    );
+                                    onUpdateAdminConfig({ customTexts: updated });
+                                  }}
+                                  className="w-full accent-yellow-400 h-1 cursor-pointer"
+                                />
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Phone Wrapper with Resize Bounding Box */}
@@ -1960,6 +2604,17 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
             {/* Visual Bounding Box with 4 Handles around Phone */}
             {nudgeTarget === 'phone' && (
               <div className="absolute -inset-4 border-2 border-dashed border-yellow-400 pointer-events-none rounded-[44px] z-50">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setNudgeTarget(null);
+                  }}
+                  className="absolute -top-6 left-1/2 -translate-x-1/2 w-5 h-5 bg-red-600 hover:bg-red-500 border border-black rounded-full pointer-events-auto flex items-center justify-center text-[10px] text-white font-black hover:scale-125 transition shadow-lg z-50 cursor-pointer animate-bounce"
+                  title="Desmarcar Celular"
+                >
+                  ×
+                </button>
                 <div 
                   onMouseDown={(e) => handleStartResize('phone', 'tl', e)}
                   className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
@@ -2033,6 +2688,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                   handleStartDrag('slot', adminConfig.slotLeft ?? 4, adminConfig.slotTop ?? 28, e.clientX, e.clientY);
                   setNudgeTarget('slot');
                 }}
+                onClick={(e) => e.stopPropagation()}
                 style={{
                   top: `${adminConfig.slotTop ?? 28}%`,
                   left: `${adminConfig.slotLeft ?? 4}%`,
@@ -2062,6 +2718,17 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                 {/* 4 Corner handles for Slot Resizing */}
                 {nudgeTarget === 'slot' && (
                   <div className="absolute -inset-3 border-2 border-dashed border-yellow-400 pointer-events-none rounded-2xl z-40">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setNudgeTarget(null);
+                      }}
+                      className="absolute -top-6 left-1/2 -translate-x-1/2 w-5 h-5 bg-red-600 hover:bg-red-500 border border-black rounded-full pointer-events-auto flex items-center justify-center text-[10px] text-white font-black hover:scale-125 transition shadow-lg z-50 cursor-pointer animate-bounce"
+                      title="Desmarcar Moldura"
+                    >
+                      ×
+                    </button>
                     <div 
                       onMouseDown={(e) => handleStartResize('slot', 'tl', e)}
                       className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
@@ -2089,15 +2756,50 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
               {/* Floating Buy Bonus Option */}
               {adminConfig.enableBuyBonus !== false && (
                 <div
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    handleStartDrag('buyBonus', adminConfig.buyBonusPosX ?? 50, adminConfig.buyBonusPosY ?? 71, e.clientX, e.clientY);
+                    setNudgeTarget('buyBonus');
+                  }}
+                  onClick={(e) => e.stopPropagation()}
                   style={{
                     position: 'absolute',
-                    top: '71%',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
+                    top: `${adminConfig.buyBonusPosY ?? 71}%`,
+                    left: `${adminConfig.buyBonusPosX ?? 50}%`,
+                    transform: `translate(-50%, -50%) scale(${(adminConfig.buyBonusScale ?? 100) / 100})`,
                   }}
-                  className="z-20 px-3.5 py-1 bg-gradient-to-r from-yellow-500 via-amber-500 to-yellow-600 text-black font-black text-[10px] rounded-full shadow-[0_4px_15px_rgba(245,158,11,0.4)] border border-yellow-300 uppercase tracking-wider flex items-center gap-1 pointer-events-none select-none"
+                  className={`z-30 px-3.5 py-1.5 bg-gradient-to-r from-yellow-500 via-amber-500 to-yellow-600 text-black font-black text-[10px] rounded-full shadow-[0_4px_15px_rgba(245,158,11,0.4)] border border-yellow-300 uppercase tracking-wider flex items-center gap-1 cursor-move select-none transition-all ${
+                    nudgeTarget === 'buyBonus' ? 'ring-2 ring-yellow-400 ring-offset-2 ring-offset-black' : ''
+                  }`}
                 >
-                  <span>⭐ Comprar Bônus (x{adminConfig.buyBonusMultiplier ?? 50})</span>
+                  <span>
+                    {(adminConfig.buyBonusLabel ?? "⭐ Comprar Bônus (x{multiplier})").replace('{multiplier}', String(adminConfig.buyBonusMultiplier ?? 50))}
+                  </span>
+
+                  {/* Handles & Close for Buy Bonus Selection */}
+                  {nudgeTarget === 'buyBonus' && (
+                    <div className="absolute -inset-2 border border-dashed border-yellow-400 pointer-events-none rounded-full z-40">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setNudgeTarget(null);
+                        }}
+                        className="absolute -top-5 left-1/2 -translate-x-1/2 w-4.5 h-4.5 bg-red-600 hover:bg-red-500 border border-black rounded-full pointer-events-auto flex items-center justify-center text-[8px] text-white font-black hover:scale-125 transition shadow-lg z-50 cursor-pointer"
+                        title="Desmarcar Botão de Bônus"
+                      >
+                        ×
+                      </button>
+                      <div 
+                        onMouseDown={(e) => {
+                          e.stopPropagation();
+                          handleStartResize('buyBonus', 'tr', e);
+                        }}
+                        className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center"
+                        title="Arrastar para Redimensionar"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2108,6 +2810,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                   handleStartDrag('spin', adminConfig.spinLeft ?? 50, 100 - (adminConfig.spinBottom ?? 4), e.clientX, e.clientY);
                   setNudgeTarget('spin');
                 }}
+                onClick={(e) => e.stopPropagation()}
                 style={{
                   bottom: `${adminConfig.spinBottom ?? 4}%`,
                   left: `${adminConfig.spinLeft ?? 50}%`,
@@ -2137,6 +2840,17 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                 {/* Corner Resizing Handles */}
                 {nudgeTarget === 'spin' && (
                   <div className="absolute -inset-3 border-2 border-dashed border-yellow-400 pointer-events-none rounded-lg z-40">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setNudgeTarget(null);
+                      }}
+                      className="absolute -top-6 left-1/2 -translate-x-1/2 w-5 h-5 bg-red-600 hover:bg-red-500 border border-black rounded-full pointer-events-auto flex items-center justify-center text-[10px] text-white font-black hover:scale-125 transition shadow-lg z-50 cursor-pointer animate-bounce"
+                      title="Desmarcar Botão"
+                    >
+                      ×
+                    </button>
                     <div 
                       onMouseDown={(e) => handleStartResize('spin', 'tl', e)}
                       className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
@@ -2170,6 +2884,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                     handleStartDrag(`button-${btn.id}`, btn.posX, btn.posY, e.clientX, e.clientY);
                     setNudgeTarget(`button-${btn.id}` as any);
                   }}
+                  onClick={(e) => e.stopPropagation()}
                   style={{
                     position: 'absolute',
                     top: `${btn.posY}%`,
@@ -2186,6 +2901,17 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                   {/* Resizing handles */}
                   {nudgeTarget === `button-${btn.id}` && (
                     <div className="absolute -inset-3 border-2 border-dashed border-yellow-400 pointer-events-none rounded-lg z-40">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setNudgeTarget(null);
+                        }}
+                        className="absolute -top-6 left-1/2 -translate-x-1/2 w-4.5 h-4.5 bg-red-600 hover:bg-red-500 border border-black rounded-full pointer-events-auto flex items-center justify-center text-[9px] text-white font-black hover:scale-125 transition shadow-lg z-50 cursor-pointer"
+                        title="Desmarcar Botão"
+                      >
+                        ×
+                      </button>
                       <div 
                         onMouseDown={(e) => handleStartResize(`button-${btn.id}`, 'tl', e)}
                         className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
@@ -2220,6 +2946,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                     handleStartDrag(`text-${txt.id}`, txt.posX, txt.posY, e.clientX, e.clientY);
                     setNudgeTarget(`text-${txt.id}` as any);
                   }}
+                  onClick={(e) => e.stopPropagation()}
                   style={{
                     position: 'absolute',
                     top: `${txt.posY}%`,
@@ -2235,6 +2962,17 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                   {/* Resizing handles */}
                   {nudgeTarget === `text-${txt.id}` && (
                     <div className="absolute -inset-3 border-2 border-dashed border-yellow-400 pointer-events-none rounded-lg z-40">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setNudgeTarget(null);
+                        }}
+                        className="absolute -top-6 left-1/2 -translate-x-1/2 w-4.5 h-4.5 bg-red-600 hover:bg-red-500 border border-black rounded-full pointer-events-auto flex items-center justify-center text-[9px] text-white font-black hover:scale-125 transition shadow-lg z-50 cursor-pointer"
+                        title="Desmarcar Texto"
+                      >
+                        ×
+                      </button>
                       <div 
                         onMouseDown={(e) => handleStartResize(`text-${txt.id}`, 'tl', e)}
                         className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"

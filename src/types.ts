@@ -125,6 +125,10 @@ export interface AdminConfig {
   bonusInstantPayMultiplier?: number; // e.g., 5x bet paid instantly on trigger
   bonusForceWinType?: 'none' | 'normal_win' | 'big_win' | 'full_screen'; // force wins during free spins
   bonusMediaUrl?: string; // Image or video URL to play on the Bonus Completed summary screen
+  buyBonusPosX?: number; // default 50 (%)
+  buyBonusPosY?: number; // default 71 (%)
+  buyBonusScale?: number; // default 100 (%)
+  buyBonusLabel?: string; // e.g. "⭐ Comprar Bônus (x{multiplier})"
 
   // Phone Viewport Canvas Position
   phonePosX?: number; // default 0 (%) offset or px
