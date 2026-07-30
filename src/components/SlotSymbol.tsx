@@ -6,6 +6,7 @@ import { SymbolType, SymbolImageConfig } from '../types';
 interface SlotSymbolProps {
   type: string;
   isWinning?: boolean;
+  isBonusPulsing?: boolean;
   customImage?: string;
   symbolConfig?: SymbolImageConfig;
   cashMultiplier?: number;
@@ -13,7 +14,7 @@ interface SlotSymbolProps {
   slotHideGrid?: boolean;
 }
 
-export const SlotSymbol: React.FC<SlotSymbolProps> = ({ type, isWinning, customImage, symbolConfig, cashMultiplier, bet, slotHideGrid = false }) => {
+export const SlotSymbol: React.FC<SlotSymbolProps> = ({ type, isWinning, isBonusPulsing, customImage, symbolConfig, cashMultiplier, bet, slotHideGrid = false }) => {
   const imageUrl = symbolConfig?.url || customImage;
   const fitMode = symbolConfig?.objectFit || 'cover';
   const offsetX = symbolConfig?.offsetX || 0;
@@ -96,7 +97,9 @@ export const SlotSymbol: React.FC<SlotSymbolProps> = ({ type, isWinning, customI
 
   return (
     <div className={`relative flex items-center justify-center w-full h-full flex-1 min-h-0 symbol-container rounded-xl overflow-hidden transition-all duration-300 ${
-      isWinning 
+      isBonusPulsing
+        ? 'bg-gradient-to-b from-[#4d3200] via-[#2d1a00] to-black border-2 border-yellow-300 z-30 scale-110 shadow-[0_0_35px_rgba(253,224,71,0.95),inset_0_0_15px_rgba(253,224,71,0.5)]'
+        : isWinning 
         ? 'bg-gradient-to-b from-[#3a2505] to-[#251502] border-2 border-yellow-400 z-10 scale-105 shadow-[0_0_25px_rgba(253,224,71,0.85),inset_0_0_12px_rgba(253,224,71,0.3)]' 
         : slotHideGrid
           ? 'bg-transparent border-none shadow-none'
@@ -105,14 +108,16 @@ export const SlotSymbol: React.FC<SlotSymbolProps> = ({ type, isWinning, customI
             : 'bg-gradient-to-b from-neutral-900/90 to-neutral-950/95 border border-[#4d3d00]/30 hover:border-[#997a00]/40 shadow-[inset_0_1px_3px_rgba(255,255,255,0.04)]'
     }`}>
       <motion.div
-        animate={isWinning ? {
+        animate={isBonusPulsing ? {
+          scale: [1, 1.25, 1, 1.25, 1, 1.25, 1],
+        } : isWinning ? {
           scale: [1, 1.15, 1],
           rotate: [0, 2, -2, 0],
         } : isWild ? {
           scale: [1, 1.05, 1],
         } : {}}
         transition={{ 
-          duration: isWinning ? 1.2 : 2.5, 
+          duration: isBonusPulsing ? 2.6 : (isWinning ? 1.2 : 2.5), 
           repeat: isWinning || isWild ? Infinity : 0, 
           ease: "easeInOut" 
         }}

@@ -178,6 +178,10 @@ export default function App() {
     instantPayout: number;
   } | null>(null);
 
+  // States for Bonus Trigger Soft Pulse before Modal
+  const [isBonusPulsing, setIsBonusPulsing] = useState<boolean>(false);
+  const [bonusPulsingCells, setBonusPulsingCells] = useState<{ col: number; row: number }[]>([]);
+
   // States for Full Screen (Tela Cheia) Celebration Overlay
   const [fullScreenCelebration, setFullScreenCelebration] = useState<{
     symbolId: string;
@@ -542,94 +546,125 @@ export default function App() {
         }));
       }
 
-      if (hasWins) {
-        setWinningLines(evaluation.winningLines);
-        setActiveWinLineIndex(0); // Trigger visual payline painter cycle
+      // Mark reels as stopped spinning first so reels settle
+      setGameState(prev => ({
+        ...prev,
+        isSpinning: false,
+        progression: Math.min(100, prev.progression + (hasWins ? 2.5 : 0.5)),
+      }));
 
-        // Check if there's a full-screen win (tela cheia)
-        const fsWin = evaluation.winningLines.find(line => line.paylineId === 'full_screen_bonus');
-        if (fsWin) {
-          const symbolId = fsWin.symbolId;
-          const symbolInfo = engineConfig.symbols.find(s => s.id === symbolId);
-          if (symbolInfo) {
-            setFullScreenCelebration({
-              symbolId,
-              symbolName: symbolInfo.name,
-              payout,
-              mediaUrl: symbolInfo.fullScreenMedia,
-              imageEmoji: symbolInfo.image,
-            });
+      // Wait 1 second (1000ms) after reel spin finishes before revealing win & animations
+      const winRevealDelay = hasWins ? (gameSettingsRef.current.turboMode ? 500 : 1000) : 0;
+
+      setTimeout(() => {
+        if (hasWins) {
+          setWinningLines(evaluation.winningLines);
+          setActiveWinLineIndex(0); // Trigger visual payline painter cycle
+
+          // Check if there's a full-screen win (tela cheia)
+          const fsWin = evaluation.winningLines.find(line => line.paylineId === 'full_screen_bonus');
+          if (fsWin) {
+            const symbolId = fsWin.symbolId;
+            const symbolInfo = engineConfig.symbols.find(s => s.id === symbolId);
+            if (symbolInfo) {
+              setFullScreenCelebration({
+                symbolId,
+                symbolName: symbolInfo.name,
+                payout,
+                mediaUrl: symbolInfo.fullScreenMedia,
+                imageEmoji: symbolInfo.image,
+              });
+            }
           }
         }
-      }
 
-      setGameState(prev => {
-        const nextBonusTotalWin = isBonusSpin ? (prev.bonusTotalWin ?? 0) + payout : prev.bonusTotalWin;
-        const entersBonusNow = !isBonusSpin && evaluation.isBonusTriggered;
+        setGameState(prev => {
+          const nextBonusTotalWin = isBonusSpin ? (prev.bonusTotalWin ?? 0) + payout : prev.bonusTotalWin;
+          const entersBonusNow = !isBonusSpin && evaluation.isBonusTriggered;
+          
+          if (entersBonusNow) {
+            const bonusLine = evaluation.winningLines.find(l => l.paylineId === 'bonus_scatter_trigger');
+            const triggerSymbolId = adminConfig.bonusTriggerSymbolId || 'crown';
+            const bonusCoords: { col: number; row: number }[] = bonusLine ? [...bonusLine.coordinates] : [];
+
+            if (bonusCoords.length === 0) {
+              for (let c = 0; c < resultGrid.length; c++) {
+                for (let r = 0; r < resultGrid[c].length; r++) {
+                  if (resultGrid[c][r] === triggerSymbolId) {
+                    bonusCoords.push({ col: c, row: r });
+                  }
+                }
+              }
+            }
+
+            setIsBonusPulsing(true);
+            setBonusPulsingCells(bonusCoords);
+            setGameSettings(s => ({ ...s, isAutoSpinning: false, autoSpinCount: 0 }));
+
+            setTimeout(() => {
+              setIsBonusPulsing(false);
+              setBonusPulsingCells([]);
+              setPendingBonusAward({
+                spinsCount: adminConfig.bonusFreeSpinsCount ?? 10,
+                instantPayout: payout,
+              });
+            }, 2800);
+          }
+
+          const stillInBonus = isBonusSpin 
+            ? (prev.bonusSpinsRemaining ?? 1) - 1 > 0 
+            : prev.inBonusRound;
+          
+          const nextSpinsRemaining = isBonusSpin
+            ? Math.max(0, (prev.bonusSpinsRemaining ?? 1) - 1)
+            : prev.bonusSpinsRemaining;
+
+          if (isBonusSpin && !stillInBonus) {
+            setBonusFinalWin(nextBonusTotalWin);
+          }
+
+          return {
+            ...prev,
+            win: payout,
+            balance: prev.balance + payout,
+            bigWin: payout >= currentBet * 15,
+            bonusTotalWin: isBonusSpin ? nextBonusTotalWin : prev.bonusTotalWin,
+            inBonusRound: stillInBonus,
+            bonusSpinsRemaining: nextSpinsRemaining,
+          };
+        });
+
+        isSpinningLockRef.current = false;
+
+        // Update casino math records and persist to localStorage
+        setAdminConfig(prev => {
+          const updated = {
+            ...prev,
+            totalSpins: prev.totalSpins + 1,
+            totalWagered: prev.totalWagered + cost,
+            totalPayout: prev.totalPayout + payout,
+          };
+          saveAdminConfig(updated);
+          return updated;
+        });
+
+        // Add to Spin Logs History
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         
-        if (entersBonusNow) {
-          setPendingBonusAward({
-            spinsCount: adminConfig.bonusFreeSpinsCount ?? 10,
-            instantPayout: payout,
-          });
-          setGameSettings(s => ({ ...s, isAutoSpinning: false, autoSpinCount: 0 }));
-        }
-
-        const stillInBonus = isBonusSpin 
-          ? (prev.bonusSpinsRemaining ?? 1) - 1 > 0 
-          : prev.inBonusRound;
-        
-        const nextSpinsRemaining = isBonusSpin
-          ? Math.max(0, (prev.bonusSpinsRemaining ?? 1) - 1)
-          : prev.bonusSpinsRemaining;
-
-        if (isBonusSpin && !stillInBonus) {
-          setBonusFinalWin(nextBonusTotalWin);
-        }
-
-        return {
-          ...prev,
-          isSpinning: false,
-          win: payout,
-          balance: prev.balance + payout,
-          bigWin: payout >= currentBet * 15,
-          progression: Math.min(100, prev.progression + (hasWins ? 2.5 : 0.5)),
-          bonusTotalWin: isBonusSpin ? nextBonusTotalWin : prev.bonusTotalWin,
-          inBonusRound: stillInBonus,
-          bonusSpinsRemaining: nextSpinsRemaining,
-        };
-      });
-
-      isSpinningLockRef.current = false;
-
-      // Update casino math records and persist to localStorage
-      setAdminConfig(prev => {
-        const updated = {
-          ...prev,
-          totalSpins: prev.totalSpins + 1,
-          totalWagered: prev.totalWagered + cost,
-          totalPayout: prev.totalPayout + payout,
-        };
-        saveAdminConfig(updated);
-        return updated;
-      });
-
-      // Add to Spin Logs History
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      
-      setSpinHistory(prev => [
-        {
-          id: Math.random().toString(36).substring(2, 11),
-          time: timeStr,
-          bet: currentBet,
-          win: payout,
-          multiplier: currentBet > 0 ? payout / currentBet : 0,
-          symbols: resultGrid.map(col => col[0] || ''),
-          isBonusSpin: isBonusSpin,
-        },
-        ...prev.slice(0, 49),
-      ]);
+        setSpinHistory(prev => [
+          {
+            id: Math.random().toString(36).substring(2, 11),
+            time: timeStr,
+            bet: currentBet,
+            win: payout,
+            multiplier: currentBet > 0 ? payout / currentBet : 0,
+            symbols: resultGrid.map(col => col[0] || ''),
+            isBonusSpin: isBonusSpin,
+          },
+          ...prev.slice(0, 49),
+        ]);
+      }, winRevealDelay);
 
       // Auto spin check using safe synchronized ref to avoid closures lag
       const currentSettings = gameSettingsRef.current;
@@ -1111,6 +1146,9 @@ export default function App() {
             customSymbols={customSymbolsMap}
             customSymbolConfigs={adminConfig.customSymbolConfigs}
             winningCells={highlightedCells}
+            winningLines={winningLines}
+            activeWinLineIndex={activeWinLineIndex}
+            bonusPulsingCells={bonusPulsingCells}
             activeSymbols={engineConfig.symbols.filter(s => s.isActive).map(s => s.id)}
             noSlotMargins={adminConfig.noSlotMargins ?? false}
             cashGrid={cashGrid}

@@ -17,6 +17,7 @@ interface SlotReelProps {
   customCashImages?: Record<number, string>;
   isAnticipating?: boolean;
   anticipationStartDelay?: number;
+  bonusPulsingRows?: number[];
   slotHideGrid?: boolean;
   anticipationColor?: 'gold' | 'red' | 'purple' | 'cyan' | 'neon_green';
 }
@@ -70,6 +71,7 @@ export const SlotReel: React.FC<SlotReelProps> = ({
   customCashImages,
   isAnticipating = false,
   anticipationStartDelay = 0,
+  bonusPulsingRows = [],
   slotHideGrid = false,
   anticipationColor = 'gold'
 }) => {
@@ -197,6 +199,7 @@ export const SlotReel: React.FC<SlotReelProps> = ({
                 key={i} 
                 type={symbol} 
                 isWinning={winningRows.includes(i)}
+                isBonusPulsing={bonusPulsingRows.includes(i)}
                 customImage={
                   symbol === 'cash' && cashMultipliers?.[i] !== undefined && customCashImages?.[cashMultipliers[i]]
                     ? customCashImages[cashMultipliers[i]]
