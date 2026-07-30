@@ -2699,11 +2699,11 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                   backgroundColor: adminConfig.slotHideOuterFrame ? 'transparent' : 'rgba(0,0,0,0.65)',
                   boxShadow: adminConfig.slotHideOuterFrame ? 'none' : '0 10px 35px rgba(0,0,0,0.8)',
                 }}
-                className={`absolute cursor-move z-20 flex items-center justify-center rounded-2xl transition-all p-1 overflow-hidden border-solid ${
+                className={`absolute cursor-move z-20 flex items-center justify-center rounded-2xl transition-all p-1 border-solid ${
                   nudgeTarget === 'slot' ? 'ring-2 ring-yellow-400 ring-offset-1 ring-offset-black' : ''
                 }`}
               >
-                <div className="w-full h-full pointer-events-none">
+                <div className="w-full h-full pointer-events-none overflow-hidden rounded-xl">
                   <SlotMachine 
                     isSpinning={gameState.isSpinning} 
                     grid={previewGrid} 
