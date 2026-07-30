@@ -1000,7 +1000,19 @@ export default function App() {
           mediaType={adminConfig.bgMediaType}
         />
 
-        {/* TOP INTERFACE BAR */}
+        {/* Game Play Area with RIGID aspect ratio matching the designer preview */}
+        <div
+          className="relative w-full h-full flex flex-col justify-between items-center select-none"
+          style={{
+            aspectRatio: '9/16',
+            width: '100%',
+            height: '100%',
+            maxWidth: 'calc(100vh * 9 / 16)',
+            maxHeight: 'calc(100vw * 16 / 9)',
+          }}
+        >
+
+          {/* TOP INTERFACE BAR */}
         {(adminConfig.showHeader !== false) && (
           <div className="absolute top-2 left-2 right-2 sm:top-4 sm:left-4 sm:right-4 z-30 flex items-center justify-between pointer-events-auto">
             
@@ -1674,6 +1686,7 @@ export default function App() {
           </div>
         )}
 
+        </div>
       </div>
 
       {/* GAME MENU MODAL */}
