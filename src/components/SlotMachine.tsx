@@ -155,19 +155,19 @@ export const SlotMachine: React.FC<SlotMachineProps> = ({
 
   return (
     <div className="relative z-10 w-full h-full flex items-center justify-center p-0.5 sm:p-1 md:p-2">
-      {/* SVG Winning Paylines Overlay */}
-      <PaylineOverlay
-        winningLines={winningLines}
-        activeWinLineIndex={activeWinLineIndex}
-        isSpinning={isSpinning}
-        gridCols={gridCols}
-        gridRows={gridRows}
-      />
-
       {/* Main Grid - Background is transparent to show background graphics */}
       <div className={`relative z-10 flex w-full h-full justify-center items-center transition-all duration-300 ${
         noSlotMargins || slotHideGrid ? 'gap-0 sm:gap-0.5' : 'gap-0.5 sm:gap-1.5 md:gap-2'
       }`}>
+        {/* SVG Winning Paylines Overlay - Placed directly inside reels grid container behind slot reels */}
+        <PaylineOverlay
+          winningLines={winningLines}
+          activeWinLineIndex={activeWinLineIndex}
+          isSpinning={isSpinning}
+          gridCols={gridCols}
+          gridRows={gridRows}
+        />
+
         {grid.map((column, index) => {
           const winningRows = winningCells
             ? winningCells.filter(cell => cell.col === index).map(cell => cell.row)

@@ -414,18 +414,28 @@ export function evaluateBoardWins(
     // Find the best winning candidate among active symbols (excluding 'cash')
     let bestSymbol: SlotSymbolConfig | null = null;
     let bestMultiplier = 0;
+    let bestMatchCount = 0;
 
     for (const sym of symbols) {
       if (!sym.isActive || sym.id === 'cash') continue;
 
-      // Check if all symbols on this line match 'sym.id' or are wild card 'wild'
-      const isMatch = lineSymbols.every(id => id === sym.id || id === 'wild');
-      if (isMatch) {
-        const matchCount = lineSymbols.length;
+      // Count consecutive matching symbols starting from reel 0 (left-to-right)
+      let matchCount = 0;
+      for (let i = 0; i < lineSymbols.length; i++) {
+        const sId = lineSymbols[i];
+        if (sId === sym.id || sId === 'wild') {
+          matchCount++;
+        } else {
+          break; // Chain broken
+        }
+      }
+
+      if (matchCount > 0) {
         const multiplier = sym.payouts[matchCount] || 0;
         if (multiplier > bestMultiplier) {
           bestMultiplier = multiplier;
           bestSymbol = sym;
+          bestMatchCount = matchCount;
         }
       }
     }
@@ -440,8 +450,8 @@ export function evaluateBoardWins(
         paylineName: line.name,
         symbolId: bestSymbol.id,
         symbolName: bestSymbol.name,
-        coordinates: [...line.coordinates],
-        matchCount: lineSymbols.length,
+        coordinates: line.coordinates.slice(0, bestMatchCount),
+        matchCount: bestMatchCount,
         multiplier: bestMultiplier,
         payoutAmount,
       });

@@ -521,15 +521,20 @@ export default function App() {
     const stagger = isTurbo ? Math.max(40, Math.floor((adminConfig.reelStaggerDelay ?? 140) / 3)) : (adminConfig.reelStaggerDelay ?? 140);
     const anticipationExtra = isAnticipating ? (isTurbo ? 800 : 2000) : 0;
     const spinDuration = baseSpeed;
-    const reelSettleBuffer = isTurbo ? 300 : 550;
-    const totalPresentationDelay = baseSpeed + (cols - 1) * stagger + anticipationExtra + reelSettleBuffer;
+    const reelSettleBuffer = isTurbo ? 350 : 600;
+
+    // Total physical motion time for all reels (including last reel & anticipation) to come to a complete halt
+    const totalReelMotionTime = baseSpeed + (cols - 1) * stagger + anticipationExtra + reelSettleBuffer;
+    
+    // Mandatory delay AFTER all reels stop before revealing win results with animation (at least 1 second / 1000ms)
+    const winRevealDelay = isTurbo ? 600 : 1000;
 
     // Trigger sequential reels stagger stop
     setTimeout(() => {
       setReelsStopTrigger(false);
     }, spinDuration);
 
-    // Present outcomes after all reels (including anticipation) have come to a complete halt
+    // Wait until ALL reels (including anticipation) have physically come to a complete stop
     setTimeout(() => {
       const hasWins = evaluation.winningLines.length > 0;
       
@@ -546,16 +551,7 @@ export default function App() {
         }));
       }
 
-      // Mark reels as stopped spinning first so reels settle
-      setGameState(prev => ({
-        ...prev,
-        isSpinning: false,
-        progression: Math.min(100, prev.progression + (hasWins ? 2.5 : 0.5)),
-      }));
-
-      // Wait 1 second (1000ms) after reel spin finishes before revealing win & animations
-      const winRevealDelay = hasWins ? (gameSettingsRef.current.turboMode ? 500 : 1000) : 0;
-
+      // Wait 1 second (1000ms) after all reels stopped before revealing win paylines, counter-up animation, and balance
       setTimeout(() => {
         if (hasWins) {
           setWinningLines(evaluation.winningLines);
@@ -625,9 +621,11 @@ export default function App() {
 
           return {
             ...prev,
+            isSpinning: false,
             win: payout,
             balance: prev.balance + payout,
             bigWin: payout >= currentBet * 15,
+            progression: Math.min(100, prev.progression + (hasWins ? 2.5 : 0.5)),
             bonusTotalWin: isBonusSpin ? nextBonusTotalWin : prev.bonusTotalWin,
             inBonusRound: stillInBonus,
             bonusSpinsRemaining: nextSpinsRemaining,
@@ -664,61 +662,61 @@ export default function App() {
           },
           ...prev.slice(0, 49),
         ]);
-      }, winRevealDelay);
 
-      // Auto spin check using safe synchronized ref to avoid closures lag
-      const currentSettings = gameSettingsRef.current;
-      if (currentSettings.isAutoSpinning) {
-        let shouldStop = false;
-        let stopReason = "";
+        // Auto spin check using safe synchronized ref to avoid closures lag
+        const currentSettings = gameSettingsRef.current;
+        if (currentSettings.isAutoSpinning) {
+          let shouldStop = false;
+          let stopReason = "";
 
-        // 1. Check if bonus was triggered
-        const stillInBonusNow = isBonusSpin ? (gameState.bonusSpinsRemaining ?? 1) - 1 > 0 : gameState.inBonusRound;
-        const justEnteredBonus = !isBonusSpin && stillInBonusNow;
-        if (currentSettings.stopOnBonusTrigger && justEnteredBonus) {
-          shouldStop = true;
-          stopReason = "Bônus ativado!";
-        }
+          // 1. Check if bonus was triggered
+          const stillInBonusNow = isBonusSpin ? (gameState.bonusSpinsRemaining ?? 1) - 1 > 0 : gameState.inBonusRound;
+          const justEnteredBonus = !isBonusSpin && stillInBonusNow;
+          if (currentSettings.stopOnBonusTrigger && justEnteredBonus) {
+            shouldStop = true;
+            stopReason = "Bônus ativado!";
+          }
 
-        // 2. Check if single win exceeds
-        if (!shouldStop && currentSettings.stopOnWinExceeds && currentSettings.stopOnWinExceeds > 0 && payout >= currentSettings.stopOnWinExceeds) {
-          shouldStop = true;
-          stopReason = `Ganho de R$ ${payout.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} superou o limite de R$ ${currentSettings.stopOnWinExceeds.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-        }
+          // 2. Check if single win exceeds
+          if (!shouldStop && currentSettings.stopOnWinExceeds && currentSettings.stopOnWinExceeds > 0 && payout >= currentSettings.stopOnWinExceeds) {
+            shouldStop = true;
+            stopReason = `Ganho de R$ ${payout.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} superou o limite de R$ ${currentSettings.stopOnWinExceeds.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+          }
 
-        // Calculate theoretical next balance after deducting bet and adding win
-        const theoreticalBalance = gameState.balance - cost + payout;
+          // Calculate theoretical next balance after deducting bet and adding win
+          const theoreticalBalance = gameState.balance - cost + payout;
 
-        // 3. Check if balance drops below
-        if (!shouldStop && currentSettings.stopOnBalanceDrop && currentSettings.stopOnBalanceDrop > 0 && theoreticalBalance <= currentSettings.stopOnBalanceDrop) {
-          shouldStop = true;
-          stopReason = `Saldo de R$ ${theoreticalBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} caiu abaixo do limite de R$ ${currentSettings.stopOnBalanceDrop.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-        }
+          // 3. Check if balance drops below
+          if (!shouldStop && currentSettings.stopOnBalanceDrop && currentSettings.stopOnBalanceDrop > 0 && theoreticalBalance <= currentSettings.stopOnBalanceDrop) {
+            shouldStop = true;
+            stopReason = `Saldo de R$ ${theoreticalBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} caiu abaixo do limite de R$ ${currentSettings.stopOnBalanceDrop.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+          }
 
-        // 4. Check if balance increases above
-        if (!shouldStop && currentSettings.stopOnBalanceIncrease && currentSettings.stopOnBalanceIncrease > 0 && theoreticalBalance >= currentSettings.stopOnBalanceIncrease) {
-          shouldStop = true;
-          stopReason = `Saldo de R$ ${theoreticalBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} subiu acima do limite de R$ ${currentSettings.stopOnBalanceIncrease.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-        }
+          // 4. Check if balance increases above
+          if (!shouldStop && currentSettings.stopOnBalanceIncrease && currentSettings.stopOnBalanceIncrease > 0 && theoreticalBalance >= currentSettings.stopOnBalanceIncrease) {
+            shouldStop = true;
+            stopReason = `Saldo de R$ ${theoreticalBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} subiu acima do limite de R$ ${currentSettings.stopOnBalanceIncrease.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+          }
 
-        if (shouldStop) {
-          setGameSettings(prev => ({
-            ...prev,
-            isAutoSpinning: false,
-            autoSpinCount: 0
-          }));
-          alert(`Giros Automáticos Parados: ${stopReason}`);
-        } else {
-          if (currentSettings.autoSpinCount > 1 && currentSettings.autoSpinCount !== 9999) {
-            setGameSettings(prev => ({ ...prev, autoSpinCount: prev.autoSpinCount - 1 }));
-          } else if (currentSettings.autoSpinCount === 9999) {
-            // Infinite spins, do not decrement
+          if (shouldStop) {
+            setGameSettings(prev => ({
+              ...prev,
+              isAutoSpinning: false,
+              autoSpinCount: 0
+            }));
+            alert(`Giros Automáticos Parados: ${stopReason}`);
           } else {
-            setGameSettings(prev => ({ ...prev, isAutoSpinning: false, autoSpinCount: 0 }));
+            if (currentSettings.autoSpinCount > 1 && currentSettings.autoSpinCount !== 9999) {
+              setGameSettings(prev => ({ ...prev, autoSpinCount: prev.autoSpinCount - 1 }));
+            } else if (currentSettings.autoSpinCount === 9999) {
+              // Infinite spins, do not decrement
+            } else {
+              setGameSettings(prev => ({ ...prev, isAutoSpinning: false, autoSpinCount: 0 }));
+            }
           }
         }
-      }
-    }, totalPresentationDelay);
+      }, winRevealDelay);
+    }, totalReelMotionTime);
   };
 
   const handleBuyBonusClick = () => {
