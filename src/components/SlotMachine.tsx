@@ -1,6 +1,6 @@
 import React from 'react';
 import { SlotReel } from './SlotReel';
-import { SymbolType, SymbolImageConfig } from '../types';
+import { SymbolType, SymbolImageConfig, SpinRollStyle } from '../types';
 import { LineWinResult } from '../slotEngine';
 
 interface PaylineOverlayProps {
@@ -128,6 +128,7 @@ interface SlotMachineProps {
   staggerDelay?: number;
   anticipationExtraDelay?: number;
   cashAnticipationColor?: 'gold' | 'red' | 'purple' | 'cyan' | 'neon_green';
+  spinRollStyle?: SpinRollStyle;
 }
 
 export const SlotMachine: React.FC<SlotMachineProps> = ({ 
@@ -148,7 +149,8 @@ export const SlotMachine: React.FC<SlotMachineProps> = ({
   slotHideGrid = false,
   staggerDelay = 120,
   anticipationExtraDelay = 1800,
-  cashAnticipationColor = 'gold'
+  cashAnticipationColor = 'gold',
+  spinRollStyle = 'standard'
 }) => {
   const gridCols = grid.length;
   const gridRows = grid[0]?.length || 3;
@@ -206,6 +208,7 @@ export const SlotMachine: React.FC<SlotMachineProps> = ({
               anticipationStartDelay={antStartDelay}
               slotHideGrid={slotHideGrid}
               anticipationColor={cashAnticipationColor}
+              spinRollStyle={spinRollStyle}
             />
           );
         })}

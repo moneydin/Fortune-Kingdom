@@ -3,12 +3,16 @@ import {
   X, Smartphone, Monitor, Eye, Grid, Crosshair, ZoomIn, ZoomOut, Maximize2, 
   RotateCcw, Sliders, Image as ImageIcon, Sparkles, Plus, Trash2, Move, 
   Type as TypeIcon, Layers, Palette, Play, Settings, DollarSign, Trophy,
-  ChevronRight, CheckCircle2, Shield, Flame, Activity, Coins, Minus, Zap, Volume2, Square
+  ChevronRight, CheckCircle2, Shield, Flame, Activity, Coins, Minus, Zap, Volume2,
+  Lock, Unlock, Key, RefreshCw, Award, Upload, Check, LayoutGrid, Dices
 } from 'lucide-react';
-import { AdminConfig, CustomButtonConfig, CustomTextConfig, GameState, SymbolType } from '../types';
+import { AdminConfig, CustomButtonConfig, CustomTextConfig, GameState, SymbolType, SymbolImageConfig, BoardType, SpinRollStyle } from '../types';
 import { SlotMachine } from './SlotMachine';
 import { BackgroundMedia } from './BackgroundMedia';
 import { SpinButton } from './SpinButton';
+import { SlotSymbol } from './SlotSymbol';
+import { SlotEngineConfig, generateBoardGrid, getBoardDimensions } from '../slotEngine';
+import { SlotEngineEditor } from './SlotEngineEditor';
 
 interface CriadorDesignerModalProps {
   isOpen: boolean;
@@ -18,18 +22,44 @@ interface CriadorDesignerModalProps {
   gameState: GameState;
   onSpin: () => void;
   onUpdateGameState: (updates: Partial<GameState>) => void;
+  engineConfig?: SlotEngineConfig;
+  onUpdateEngineConfig?: (newConfig: SlotEngineConfig) => void;
+  onUpdateBalance?: (newBalance: number) => void;
+  onResetStats?: () => void;
 }
 
 const SYMBOL_LIST: { type: SymbolType; label: string }[] = [
-  { type: 'King', label: 'Rei K' },
-  { type: 'Queen', label: 'Rainha Q' },
-  { type: 'Crown', label: 'Coroa Impreial' },
+  { type: 'Crown', label: 'Coroa Imperial' },
+  { type: 'Dragon', label: 'Dragão do Reino' },
+  { type: 'King', label: 'Rei Supremo' },
+  { type: 'Queen', label: 'Rainha K' },
   { type: 'Lion', label: 'Leão Dourado' },
-  { type: 'Sword', label: 'Espada Lendária' },
-  { type: 'Shield', label: 'Escudo Real' },
-  { type: 'Castle', label: 'Castelo' },
+  { type: 'Castle', label: 'Castelo Real' },
+  { type: 'Sword', label: 'Espada Mágica' },
+  { type: 'Shield', label: 'Escudo Lendário' },
   { type: 'Diamond', label: 'Diamante Azul' },
   { type: 'Coin', label: 'Moeda de Ouro' },
+];
+
+const BOARD_OPTIONS: { id: BoardType; label: string; desc: string }[] = [
+  { id: '3x1', label: '3x1', desc: 'Retrô 1 Linha (3×1)' },
+  { id: '3x3', label: '3x3', desc: 'Clássico 3x3 (3×3)' },
+  { id: '4x3', label: '4x3', desc: 'Moderno 4x3 (4×3)' },
+  { id: '4x4', label: '4x4', desc: 'Quadrado 4x4 (4×4)' },
+  { id: '5x3', label: '5x3', desc: 'Padrão Slot (5×3)' },
+  { id: '5x4', label: '5x4', desc: 'Expandido (5×4)' },
+  { id: '6x3', label: '6x3', desc: 'Largo 6x3 (6×3)' },
+  { id: '6x4', label: '6x4', desc: 'Megaways (6×4)' },
+  { id: '7x7', label: '7x7', desc: 'Grid Cluster (7×7)' },
+];
+
+const SPIN_ROLL_STYLES: { id: SpinRollStyle; label: string; desc: string; icon: string }[] = [
+  { id: 'standard', label: 'Giro Tradicional', desc: 'Rotor vertical clássico com freio elástico', icon: '🎰' },
+  { id: 'cascade', label: 'Queda Cascata', desc: 'Símbolos caindo do topo (Tumble/Avalanche) com gravidade', icon: '⚡' },
+  { id: 'bounce_rebound', label: 'Recuo Elástico', desc: 'Giro dinâmico com quique forte e efeito mola ao travar', icon: '🏀' },
+  { id: 'hyper_blur', label: 'Super Blur Neon', desc: 'Borrão de movimento em alta velocidade com travamento seco', icon: '🌀' },
+  { id: 'scale_pop', label: 'Zoom & Pop 3D', desc: 'Animação de escala 3D surgindo em destaque no resultado', icon: '✨' },
+  { id: 'wave_swing', label: 'Onda Harmônica', desc: 'Balanço senoidal em fase horizontal e vertical durante a rolagem', icon: '🌊' },
 ];
 
 export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
@@ -40,17 +70,35 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
   gameState,
   onSpin,
   onUpdateGameState,
+  engineConfig,
+  onUpdateEngineConfig,
+  onUpdateBalance,
+  onResetStats,
 }) => {
-  const [activeTab, setActiveTab] = useState<'screen' | 'slot' | 'buttons' | 'hud' | 'text' | 'symbols'>('screen');
+  const [activeTab, setActiveTab] = useState<'metrics' | 'engine' | 'screen' | 'symbols' | 'buttons' | 'hud'>('metrics');
   
+  // Security & Authentication
+  const [isLocked, setIsLocked] = useState<boolean>(false);
+  const [pinInput, setPinInput] = useState<string>('');
+  const [pinError, setPinError] = useState<boolean>(false);
+
   // Phone viewport scale & presets
   const [phoneWidth, setPhoneWidth] = useState<number>(360);
-  const [phoneScale, setPhoneScale] = useState<number>(100);
   const [showGridLines, setShowGridLines] = useState<boolean>(true);
   const [dragPrecisionMode, setDragPrecisionMode] = useState<'fine' | 'normal'>('fine');
 
   // Dragging states
   const previewCanvasRef = useRef<HTMLDivElement>(null);
+
+  // Active Board & Preview Grid Calculations
+  const activeBoardType: BoardType = adminConfig.boardType || '5x3';
+  const activeBoardDims = getBoardDimensions(activeBoardType);
+
+  const previewGrid = React.useMemo(() => {
+    return generateBoardGrid(activeBoardType, engineConfig?.symbols || []);
+  }, [activeBoardType, engineConfig?.symbols]);
+
+  const activeRollStyle = SPIN_ROLL_STYLES.find(s => s.id === (adminConfig.spinRollStyle || 'standard')) || SPIN_ROLL_STYLES[0];
   const [draggingTarget, setDraggingTarget] = useState<string | null>(null);
   const dragStartRef = useRef<{ x: number; y: number; initialX: number; initialY: number }>({ x: 0, y: 0, initialX: 0, initialY: 0 });
 
@@ -68,13 +116,80 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
   const [newTextSize, setNewTextSize] = useState<number>(14);
   const [newTextColor, setNewTextColor] = useState<string>('#fde047');
 
+  // Custom balance input
+  const [customBalanceInput, setCustomBalanceInput] = useState<string>('');
+  const [newBetPresetInput, setNewBetPresetInput] = useState<string>('');
+
   if (!isOpen) return null;
+
+  // PIN Unlock Check
+  if (isLocked) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-2xl flex items-center justify-center font-sans text-white p-4">
+        <div className="max-w-md w-full bg-[#0d0e15] border border-red-500/30 rounded-2xl p-6 shadow-2xl space-y-5 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-red-600 to-amber-500 p-0.5 mx-auto shadow-lg flex items-center justify-center">
+            <div className="w-full h-full bg-black rounded-[14px] flex items-center justify-center">
+              <Lock className="w-8 h-8 text-amber-400" />
+            </div>
+          </div>
+
+          <div>
+            <h2 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 uppercase tracking-wide">
+              Estúdio de Criação Protegido
+            </h2>
+            <p className="text-xs text-gray-400 mt-1">
+              Digite a senha de administrador/desenvolvedor para acessar
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <input
+              type="password"
+              placeholder="Digite a senha (ex: 777 ou 0000)"
+              value={pinInput}
+              onChange={(e) => { setPinInput(e.target.value); setPinError(false); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  if (pinInput === '777' || pinInput === '0000' || pinInput === '1234' || pinInput === '') {
+                    setIsLocked(false);
+                  } else {
+                    setPinError(true);
+                  }
+                }
+              }}
+              className="w-full px-4 py-3 bg-black/80 border border-white/20 rounded-xl text-center font-mono text-lg text-yellow-300 focus:outline-none focus:border-red-500 tracking-widest"
+            />
+
+            {pinError && (
+              <p className="text-xs text-red-400 font-bold animate-shake">
+                ⚠️ Senha incorreta! Tente 777, 0000 ou pressione Enter.
+              </p>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                if (pinInput === '777' || pinInput === '0000' || pinInput === '1234' || pinInput === '') {
+                  setIsLocked(false);
+                } else {
+                  setPinError(true);
+                }
+              }}
+              className="w-full py-3 bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-black font-black uppercase text-xs tracking-widest rounded-xl shadow-lg transition cursor-pointer"
+            >
+              Desbloquear Estúdio
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const roundPrecision = (val: number) => {
     return dragPrecisionMode === 'fine' ? Math.round(val * 10) / 10 : Math.round(val);
   };
 
-  // Generic Drag Start
+  // Generic Drag Start for Canvas
   const handleStartDrag = (target: string, initialX: number, initialY: number, clientX: number, clientY: number) => {
     setDraggingTarget(target);
     dragStartRef.current = { x: clientX, y: clientY, initialX, initialY };
@@ -86,8 +201,8 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
     const deltaX = ((e.clientX - dragStartRef.current.x) / rect.width) * 100;
     const deltaY = ((e.clientY - dragStartRef.current.y) / rect.height) * 100;
 
-    const newX = Math.max(0, Math.min(100, roundPrecision(dragStartRef.current.initialX + deltaX)));
-    const newY = Math.max(0, Math.min(100, roundPrecision(dragStartRef.current.initialY + deltaY)));
+    const newX = Math.max(-50, Math.min(150, roundPrecision(dragStartRef.current.initialX + deltaX)));
+    const newY = Math.max(-50, Math.min(150, roundPrecision(dragStartRef.current.initialY + deltaY)));
 
     if (draggingTarget === 'slot') {
       onUpdateAdminConfig({ slotLeft: newX, slotTop: newY });
@@ -111,11 +226,61 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
         t.id === textId ? { ...t, posX: newX, posY: newY } : t
       );
       onUpdateAdminConfig({ customTexts: updatedTexts });
+    } else if (draggingTarget.startsWith('symbol-pan-')) {
+      const symType = draggingTarget.replace('symbol-pan-', '') as SymbolType;
+      const currentConfigs = adminConfig.customSymbolConfigs || {};
+      const symConfig = currentConfigs[symType] || { url: adminConfig.customSymbols?.[symType] || '' };
+      
+      const panDeltaX = Math.round((e.clientX - dragStartRef.current.x) * 0.8);
+      const panDeltaY = Math.round((e.clientY - dragStartRef.current.y) * 0.8);
+      
+      const newOffsetX = Math.max(-100, Math.min(100, dragStartRef.current.initialX + panDeltaX));
+      const newOffsetY = Math.max(-100, Math.min(100, dragStartRef.current.initialY + panDeltaY));
+
+      onUpdateAdminConfig({
+        customSymbolConfigs: {
+          ...currentConfigs,
+          [symType]: {
+            ...symConfig,
+            offsetX: newOffsetX,
+            offsetY: newOffsetY,
+          }
+        }
+      });
     }
   };
 
   const handleMouseUp = () => {
     setDraggingTarget(null);
+  };
+
+  // Symbol Image File Upload: Default to CONTAIN (Full image, no cropping)
+  const handleFileUploadForSymbol = (type: SymbolType, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result && typeof event.target.result === 'string') {
+          const url = event.target.result;
+          const updatedSymbols = { ...adminConfig.customSymbols, [type]: url };
+          const updatedConfigs = {
+            ...(adminConfig.customSymbolConfigs || {}),
+            [type]: {
+              url,
+              objectFit: 'contain' as const, // FULL UNCROPPED IMAGE BY DEFAULT!
+              offsetX: 0,
+              offsetY: 0,
+              scale: 100,
+            },
+          };
+          onUpdateAdminConfig({
+            customSymbols: updatedSymbols,
+            customSymbolConfigs: updatedConfigs,
+          });
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   // Add Custom Button
@@ -174,13 +339,19 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
     });
   };
 
+  // Calculations for Session Metrics
+  const calculatedRtp = adminConfig.totalWagered > 0 
+    ? ((adminConfig.totalPayout / adminConfig.totalWagered) * 100).toFixed(1) 
+    : '100.0';
+  const calculatedGgr = (adminConfig.totalWagered - adminConfig.totalPayout).toFixed(2);
+
   return (
     <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl flex flex-col font-sans text-white overflow-hidden animate-in fade-in duration-200 select-none">
       
-      {/* Studio Top Header Navigation */}
-      <header className="w-full bg-[#0d0e14] border-b border-red-500/30 px-4 py-2.5 flex items-center justify-between shrink-0 shadow-xl">
+      {/* Studio Top Header Bar */}
+      <header className="w-full bg-[#0b0c12] border-b border-red-500/30 px-4 py-2.5 flex items-center justify-between shrink-0 shadow-2xl">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-600 via-amber-500 to-yellow-400 p-0.5 shadow-[0_0_15px_rgba(239,68,68,0.5)]">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-600 via-amber-500 to-yellow-400 p-0.5 shadow-[0_0_20px_rgba(239,68,68,0.6)]">
             <div className="w-full h-full bg-black rounded-[10px] flex items-center justify-center">
               <Sparkles className="w-5 h-5 text-amber-400 animate-pulse" />
             </div>
@@ -188,21 +359,25 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-base font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 uppercase">
-                Criador Designer Studio
+                ESTÚDIO ENGINE DE CRIAÇÃO DE SLOT
               </h1>
-              <span className="bg-red-950/80 border border-red-500/40 text-red-300 text-[9px] font-black px-2 py-0.5 rounded-full tracking-widest uppercase">
-                Estúdio PC
+              <span className="bg-red-950/90 border border-red-500/50 text-red-300 text-[9px] font-black px-2 py-0.5 rounded-full tracking-widest uppercase shadow">
+                Professional v3.0
               </span>
             </div>
-            <p className="text-[10px] text-gray-400 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-              Simulador em Tempo Real com Alta Precisão de Elementos
+            <p className="text-[10px] text-gray-400 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span>RTP Ativo: <b>{adminConfig.targetRtp}%</b></span>
+              <span className="text-gray-600">•</span>
+              <span>Motor: <b>{adminConfig.boardType || '5x3'}</b></span>
+              <span className="text-gray-600">•</span>
+              <span>GGR: <b className="text-emerald-400">R$ {calculatedGgr}</b></span>
             </p>
           </div>
         </div>
 
         {/* Toolbar Center Quick Controls */}
-        <div className="hidden md:flex items-center gap-2 bg-black/60 p-1 rounded-xl border border-white/10">
+        <div className="hidden md:flex items-center gap-2 bg-black/80 p-1 rounded-xl border border-white/10">
           <button
             type="button"
             onClick={() => setShowGridLines(!showGridLines)}
@@ -228,7 +403,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
           <div className="h-4 w-[1px] bg-white/10 mx-1" />
 
           <div className="flex items-center gap-1 text-xs text-gray-300">
-            <span className="text-[10px] uppercase font-bold text-gray-400">Celular:</span>
+            <span className="text-[10px] uppercase font-bold text-gray-400">Tela:</span>
             <button
               type="button"
               onClick={() => setPhoneWidth(290)}
@@ -253,286 +428,465 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
           </div>
         </div>
 
-        {/* Right Close Button */}
+        {/* Right Actions */}
         <div className="flex items-center gap-2">
           <button
             type="button"
+            onClick={() => setIsLocked(true)}
+            className="p-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-xl transition cursor-pointer border border-white/10"
+            title="Bloquear Painel"
+          >
+            <Lock className="w-4 h-4 text-amber-400" />
+          </button>
+
+          <button
+            type="button"
             onClick={onClose}
-            className="p-2 bg-white/5 hover:bg-red-600/80 active:scale-95 text-gray-300 hover:text-white rounded-xl transition cursor-pointer flex items-center gap-1.5 text-xs font-bold border border-white/10"
+            className="p-2 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 active:scale-95 text-white rounded-xl transition cursor-pointer flex items-center gap-1.5 text-xs font-black shadow-lg border border-red-400/40"
           >
             <X className="w-4 h-4" />
-            <span>Sair do Criador</span>
+            <span>Fechar Estúdio</span>
           </button>
         </div>
       </header>
 
-      {/* Main Studio Body Grid */}
+      {/* Main Studio Workspace Grid */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
         
-        {/* Left Control Panel Navigation Tabs & Controls (4 Cols) */}
-        <div className="lg:col-span-4 bg-[#090a0f] border-r border-red-500/20 flex flex-col h-full overflow-hidden">
+        {/* Left Control Panel (5 Cols) */}
+        <div className="lg:col-span-5 bg-[#08090d] border-r border-red-500/20 flex flex-col h-full overflow-hidden">
           
-          {/* Tab Selector Buttons */}
-          <div className="grid grid-cols-3 gap-1 p-2 bg-black/60 border-b border-white/10 text-xs">
+          {/* Main Navigation Tabs */}
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-1 p-2 bg-black/80 border-b border-white/10 text-xs">
+            <button
+              type="button"
+              onClick={() => setActiveTab('metrics')}
+              className={`p-2 rounded-lg font-bold flex flex-col items-center gap-1 transition cursor-pointer ${
+                activeTab === 'metrics' ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-lg' : 'text-gray-400 hover:bg-white/5'
+              }`}
+            >
+              <Activity className="w-4 h-4" />
+              <span className="text-[9px]">1. Métricas & RTP</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('engine')}
+              className={`p-2 rounded-lg font-bold flex flex-col items-center gap-1 transition cursor-pointer ${
+                activeTab === 'engine' ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-lg' : 'text-gray-400 hover:bg-white/5'
+              }`}
+            >
+              <Settings className="w-4 h-4" />
+              <span className="text-[9px]">2. Motor & Regras</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setActiveTab('screen')}
               className={`p-2 rounded-lg font-bold flex flex-col items-center gap-1 transition cursor-pointer ${
-                activeTab === 'screen' ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow' : 'text-gray-400 hover:bg-white/5'
+                activeTab === 'screen' ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-lg' : 'text-gray-400 hover:bg-white/5'
               }`}
             >
               <Smartphone className="w-4 h-4" />
-              <span className="text-[10px]">1. Fundo & Tela</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('slot')}
-              className={`p-2 rounded-lg font-bold flex flex-col items-center gap-1 transition cursor-pointer ${
-                activeTab === 'slot' ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow' : 'text-gray-400 hover:bg-white/5'
-              }`}
-            >
-              <Grid className="w-4 h-4" />
-              <span className="text-[10px]">2. Slot & Grade</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('buttons')}
-              className={`p-2 rounded-lg font-bold flex flex-col items-center gap-1 transition cursor-pointer ${
-                activeTab === 'buttons' ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow' : 'text-gray-400 hover:bg-white/5'
-              }`}
-            >
-              <Sliders className="w-4 h-4" />
-              <span className="text-[10px]">3. Botões</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('hud')}
-              className={`p-2 rounded-lg font-bold flex flex-col items-center gap-1 transition cursor-pointer ${
-                activeTab === 'hud' ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow' : 'text-gray-400 hover:bg-white/5'
-              }`}
-            >
-              <DollarSign className="w-4 h-4" />
-              <span className="text-[10px]">4. Saldo & Aposta</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab('text')}
-              className={`p-2 rounded-lg font-bold flex flex-col items-center gap-1 transition cursor-pointer ${
-                activeTab === 'text' ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow' : 'text-gray-400 hover:bg-white/5'
-              }`}
-            >
-              <TypeIcon className="w-4 h-4" />
-              <span className="text-[10px]">5. Textos</span>
+              <span className="text-[9px]">3. Fundo & Quadro</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('symbols')}
               className={`p-2 rounded-lg font-bold flex flex-col items-center gap-1 transition cursor-pointer ${
-                activeTab === 'symbols' ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow' : 'text-gray-400 hover:bg-white/5'
+                activeTab === 'symbols' ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-lg' : 'text-gray-400 hover:bg-white/5'
               }`}
             >
               <ImageIcon className="w-4 h-4" />
-              <span className="text-[10px]">6. Símbolos</span>
+              <span className="text-[9px]">4. Símbolos & Imagens</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('buttons')}
+              className={`p-2 rounded-lg font-bold flex flex-col items-center gap-1 transition cursor-pointer ${
+                activeTab === 'buttons' ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-lg' : 'text-gray-400 hover:bg-white/5'
+              }`}
+            >
+              <Sliders className="w-4 h-4" />
+              <span className="text-[9px]">5. Botões & Ações</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('hud')}
+              className={`p-2 rounded-lg font-bold flex flex-col items-center gap-1 transition cursor-pointer ${
+                activeTab === 'hud' ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white shadow-lg' : 'text-gray-400 hover:bg-white/5'
+              }`}
+            >
+              <TypeIcon className="w-4 h-4" />
+              <span className="text-[9px]">6. Textos & HUD</span>
             </button>
           </div>
 
-          {/* Active Tab Panel Content */}
+          {/* Active Tab Panel Body */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             
-            {/* TAB 1: SCREEN & BACKGROUND */}
-            {activeTab === 'screen' && (
+            {/* -------------------------------------------------------------
+                TAB 1: METRICS, RTP & FINANCIAL MANAGEMENT (ADMIN)
+                ------------------------------------------------------------- */}
+            {activeTab === 'metrics' && (
               <div className="space-y-4 animate-in fade-in duration-150">
-                <div className="bg-black/50 p-3 rounded-xl border border-red-500/20 space-y-3">
-                  <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <ImageIcon className="w-4 h-4 text-amber-400" />
-                    <span>Mídia do Fundo (Imagem / Vídeo Loop)</span>
-                  </h3>
-
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-gray-300 font-bold">URL da Imagem ou Vídeo (.mp4):</label>
-                    <input
-                      type="text"
-                      value={adminConfig.bgImage}
-                      onChange={(e) => onUpdateAdminConfig({ bgImage: e.target.value })}
-                      placeholder="https://exemplo.com/fundo.png"
-                      className="w-full px-3 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-yellow-300 focus:outline-none focus:border-red-500 font-mono"
-                    />
+                
+                {/* Financial Session Metrics */}
+                <div className="bg-gradient-to-r from-red-950/60 via-black to-red-950/60 p-3.5 rounded-xl border border-red-500/30 space-y-3">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                    <h3 className="text-xs font-black text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <DollarSign className="w-4 h-4 text-emerald-400" />
+                      <span>Métricas Financeiras da Sessão</span>
+                    </h3>
+                    {onResetStats && (
+                      <button
+                        type="button"
+                        onClick={onResetStats}
+                        className="px-2 py-0.5 bg-red-950 hover:bg-red-900 border border-red-500/40 text-red-300 rounded text-[9px] font-bold transition flex items-center gap-1"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        <span>Resetar</span>
+                      </button>
+                    )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Posição X (%):</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={adminConfig.bgPosX ?? 0}
-                        onChange={(e) => onUpdateAdminConfig({ bgPosX: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-2 py-1 bg-black/80 border border-white/20 rounded text-xs text-yellow-300 font-mono"
-                      />
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="bg-black/60 p-2 rounded-lg border border-white/5 text-center">
+                      <span className="text-[9px] text-gray-400 uppercase font-bold block">Total Giros</span>
+                      <span className="text-sm font-black font-mono text-white">{adminConfig.totalSpins}</span>
                     </div>
-                    <div>
-                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Posição Y (%):</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={adminConfig.bgPosY ?? 0}
-                        onChange={(e) => onUpdateAdminConfig({ bgPosY: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-2 py-1 bg-black/80 border border-white/20 rounded text-xs text-yellow-300 font-mono"
-                      />
-                    </div>
-                  </div>
 
-                  <div>
-                    <label className="text-[10px] text-gray-300 font-bold block mb-1">Zoom do Fundo ({adminConfig.bgZoom || 100}%):</label>
-                    <input
-                      type="range"
-                      min="100"
-                      max="300"
-                      value={adminConfig.bgZoom || 100}
-                      onChange={(e) => onUpdateAdminConfig({ bgZoom: parseInt(e.target.value) })}
-                      className="w-full accent-amber-500 cursor-pointer h-1.5"
-                    />
+                    <div className="bg-black/60 p-2 rounded-lg border border-white/5 text-center">
+                      <span className="text-[9px] text-gray-400 uppercase font-bold block">Volume Apostado</span>
+                      <span className="text-sm font-black font-mono text-amber-300">R$ {adminConfig.totalWagered.toFixed(2)}</span>
+                    </div>
+
+                    <div className="bg-black/60 p-2 rounded-lg border border-white/5 text-center">
+                      <span className="text-[9px] text-gray-400 uppercase font-bold block">Prêmios Pagos</span>
+                      <span className="text-sm font-black font-mono text-emerald-400">R$ {adminConfig.totalPayout.toFixed(2)}</span>
+                    </div>
+
+                    <div className="bg-black/60 p-2 rounded-lg border border-white/5 text-center">
+                      <span className="text-[9px] text-gray-400 uppercase font-bold block">RTP Real</span>
+                      <span className="text-sm font-black font-mono text-yellow-300">{calculatedRtp}%</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Phone Simulator Scale */}
-                <div className="bg-black/50 p-3 rounded-xl border border-red-500/20 space-y-3">
+                {/* RTP & Volatility Config */}
+                <div className="bg-black/50 p-3.5 rounded-xl border border-red-500/20 space-y-3">
                   <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <Smartphone className="w-4 h-4 text-amber-400" />
-                    <span>Escala do Celular Simulado</span>
+                    <Flame className="w-4 h-4 text-amber-400" />
+                    <span>RTP Desejado & Volatilidade do Casino</span>
                   </h3>
 
                   <div>
-                    <div className="flex justify-between text-[10px] text-gray-300 mb-1">
-                      <span>Tamanho da Tela:</span>
-                      <span className="font-mono text-amber-300">{phoneWidth}px</span>
+                    <div className="flex justify-between text-[10px] font-bold text-gray-300 mb-1">
+                      <span>RTP Alvo (Retorno ao Jogador):</span>
+                      <span className="text-amber-300 font-mono text-xs">{adminConfig.targetRtp}%</span>
                     </div>
                     <input
                       type="range"
-                      min="260"
-                      max="500"
-                      step="10"
-                      value={phoneWidth}
-                      onChange={(e) => setPhoneWidth(parseInt(e.target.value))}
-                      className="w-full accent-amber-500 cursor-pointer h-1.5"
+                      min="80"
+                      max="99"
+                      step="0.5"
+                      value={adminConfig.targetRtp}
+                      onChange={(e) => onUpdateAdminConfig({ targetRtp: parseFloat(e.target.value) })}
+                      className="w-full accent-amber-500 cursor-pointer h-2"
                     />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] text-gray-300 font-bold block mb-1">Nível de Volatilidade:</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: 'low', name: 'Baixa (Paga Mais Vezes)', color: 'border-emerald-500 text-emerald-300 bg-emerald-950/40' },
+                        { id: 'medium', name: 'Média (Equilibrada)', color: 'border-yellow-500 text-yellow-300 bg-yellow-950/40' },
+                        { id: 'high', name: 'Alta (Prêmios Grandes)', color: 'border-red-500 text-red-300 bg-red-950/40' },
+                      ].map((vol) => (
+                        <button
+                          key={vol.id}
+                          type="button"
+                          onClick={() => onUpdateAdminConfig({ volatility: vol.id as any })}
+                          className={`py-2 px-2 rounded-lg border text-[10px] font-black uppercase text-center transition cursor-pointer ${
+                            adminConfig.volatility === vol.id
+                              ? `${vol.color} ring-2 ring-white/50 shadow-lg`
+                              : 'bg-black/60 border-white/10 text-gray-400 hover:border-white/30'
+                          }`}
+                        >
+                          {vol.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* DEMO MODE: Forced Next Outcome */}
+                <div className="bg-black/50 p-3.5 rounded-xl border border-yellow-500/30 space-y-3">
+                  <h3 className="text-xs font-black text-yellow-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                    <span>Forçar Próximo Resultado (Modo Demonstração)</span>
+                  </h3>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {[
+                      { id: 'none', label: '🎲 Aleatório (RNG)', color: 'bg-gray-800 text-gray-200' },
+                      { id: 'normal_win', label: '✅ Vitória Normal', color: 'bg-emerald-900 text-emerald-200' },
+                      { id: 'big_win', label: '💥 Mega Vitória', color: 'bg-amber-900 text-amber-200' },
+                      { id: 'full_screen', label: '👑 Tela Cheia', color: 'bg-purple-900 text-purple-200' },
+                      { id: 'loss', label: '❌ Derrota (Sem Pagar)', color: 'bg-red-950 text-red-200' },
+                      { id: 'force_cash_collect', label: '💵 5x Dinheiro Board', color: 'bg-green-950 text-green-200' },
+                    ].map((outcome) => (
+                      <button
+                        key={outcome.id}
+                        type="button"
+                        onClick={() => onUpdateAdminConfig({ forcedOutcome: outcome.id as any })}
+                        className={`p-2 rounded-lg font-extrabold text-[10px] uppercase transition cursor-pointer border ${
+                          adminConfig.forcedOutcome === outcome.id
+                            ? `${outcome.color} border-yellow-400 ring-2 ring-yellow-400/50 scale-102`
+                            : 'bg-black/60 border-white/10 text-gray-400 hover:border-white/30'
+                        }`}
+                      >
+                        {outcome.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Player Balance Management */}
+                <div className="bg-black/50 p-3.5 rounded-xl border border-red-500/20 space-y-3">
+                  <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <DollarSign className="w-4 h-4 text-emerald-400" />
+                    <span>Gestão do Saldo do Jogador</span>
+                  </h3>
+
+                  <div className="flex items-center justify-between bg-black/80 p-3 rounded-lg border border-white/10">
+                    <div>
+                      <span className="text-[10px] text-gray-400 font-bold block">Saldo Atual em Conta:</span>
+                      <span className="text-lg font-black font-mono text-emerald-400">R$ {gameState.balance.toFixed(2)}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => onUpdateBalance?.(gameState.balance + 1000)}
+                        className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px] rounded-lg shadow cursor-pointer uppercase"
+                      >
+                        + R$ 1.000
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => onUpdateBalance?.(gameState.balance + 10000)}
+                        className="px-2.5 py-1.5 bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-black text-[10px] rounded-lg shadow cursor-pointer uppercase"
+                      >
+                        + R$ 10.000
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      placeholder="Digitar valor exato R$"
+                      value={customBalanceInput}
+                      onChange={(e) => setCustomBalanceInput(e.target.value)}
+                      className="flex-1 px-3 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-emerald-300 font-mono font-bold focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const val = parseFloat(customBalanceInput);
+                        if (!isNaN(val) && val >= 0) {
+                          onUpdateBalance?.(val);
+                          setCustomBalanceInput('');
+                        }
+                      }}
+                      className="px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white font-black text-xs uppercase rounded-lg shadow cursor-pointer"
+                    >
+                      Aplicar Saldo
+                    </button>
+                  </div>
+                </div>
+
+                {/* Bet Limits & Presets */}
+                <div className="bg-black/50 p-3.5 rounded-xl border border-red-500/20 space-y-3">
+                  <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider">
+                    Limites de Aposta & Valores Disponíveis
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Aposta Mínima R$:</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={adminConfig.minBet}
+                        onChange={(e) => onUpdateAdminConfig({ minBet: parseFloat(e.target.value) || 0.1 })}
+                        className="w-full px-2.5 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-yellow-300 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Aposta Máxima R$:</label>
+                      <input
+                        type="number"
+                        step="1"
+                        value={adminConfig.maxBet}
+                        onChange={(e) => onUpdateAdminConfig({ maxBet: parseFloat(e.target.value) || 500 })}
+                        className="w-full px-2.5 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-yellow-300 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] text-gray-300 font-bold block mb-1">Valores de Aposta Rápidos (Chips):</label>
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {(adminConfig.betPresets || [0.5, 1, 2, 5, 10, 20, 50, 100]).map((preset) => (
+                        <span key={preset} className="px-2.5 py-1 bg-amber-500/20 border border-amber-500/40 text-amber-300 rounded-lg text-xs font-mono font-bold flex items-center gap-1">
+                          R$ {preset}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const filtered = (adminConfig.betPresets || [0.5, 1, 2, 5, 10, 20, 50, 100]).filter(p => p !== preset);
+                              onUpdateAdminConfig({ betPresets: filtered });
+                            }}
+                            className="text-red-400 hover:text-red-200 ml-0.5"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        step="0.5"
+                        placeholder="Adicionar aposta R$"
+                        value={newBetPresetInput}
+                        onChange={(e) => setNewBetPresetInput(e.target.value)}
+                        className="flex-1 px-3 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-white font-mono focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const parsed = parseFloat(newBetPresetInput);
+                          if (!isNaN(parsed) && parsed > 0) {
+                            const current = adminConfig.betPresets || [0.5, 1, 2, 5, 10, 20, 50, 100];
+                            if (!current.includes(parsed)) {
+                              onUpdateAdminConfig({ betPresets: [...current, parsed].sort((a, b) => a - b) });
+                            }
+                            setNewBetPresetInput('');
+                          }
+                        }}
+                        className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs rounded-lg shadow cursor-pointer uppercase"
+                      >
+                        + Add
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* TAB 2: SLOT FRAME & SYMBOL GRID */}
-            {activeTab === 'slot' && (
+            {/* -------------------------------------------------------------
+                TAB 2: ENGINE & MATH RULES (ADMIN + ENGINE EDITOR)
+                ------------------------------------------------------------- */}
+            {activeTab === 'engine' && (
               <div className="space-y-4 animate-in fade-in duration-150">
                 
-                {/* SPECIAL FEATURE: HIDE GRID / FRAMELESS SYMBOLS */}
-                <div className="bg-gradient-to-r from-red-950/80 via-black to-red-950/80 p-3.5 rounded-xl border-2 border-red-500/50 space-y-3 shadow-lg">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-amber-400 animate-spin" />
-                    <div>
-                      <h3 className="text-xs font-black text-amber-300 uppercase tracking-wider">
-                        Modo Símbolos Flutuantes (Sem Grade / Sem Caixa)
-                      </h3>
-                      <p className="text-[10px] text-gray-300">
-                        Deixa cada elemento/figura transparente, sem caixas/quadrados/grades, mantendo a animação de rolagem perfeita.
-                      </p>
-                    </div>
-                  </div>
-
-                  <label className="flex items-center gap-2.5 p-2 bg-black/80 rounded-lg border border-white/10 cursor-pointer hover:border-amber-400/50 transition">
-                    <input
-                      type="checkbox"
-                      checked={adminConfig.slotHideGrid ?? false}
-                      onChange={(e) => onUpdateAdminConfig({ slotHideGrid: e.target.checked })}
-                      className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
-                    />
-                    <span className="text-xs font-extrabold text-white">
-                      Remover Grade e Fundo dos Símbolos (Apenas Imagem)
-                    </span>
-                  </label>
-
-                  <label className="flex items-center gap-2.5 p-2 bg-black/80 rounded-lg border border-white/10 cursor-pointer hover:border-amber-400/50 transition">
-                    <input
-                      type="checkbox"
-                      checked={adminConfig.slotHideOuterFrame ?? false}
-                      onChange={(e) => onUpdateAdminConfig({ slotHideOuterFrame: e.target.checked })}
-                      className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
-                    />
-                    <span className="text-xs font-extrabold text-white">
-                      Remover Moldura Externa do Quadro
-                    </span>
-                  </label>
-                </div>
-
-                {/* Slot Position Controls */}
-                <div className="bg-black/50 p-3 rounded-xl border border-red-500/20 space-y-3">
-                  <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider">
-                    Posicionamento do Quadro de Slots
+                {/* Board Type Selector */}
+                <div className="bg-black/50 p-3.5 rounded-xl border border-red-500/20 space-y-3">
+                  <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <LayoutGrid className="w-4 h-4 text-amber-400" />
+                    <span>Tipo de Tabuleiro / Grade do Slot</span>
                   </h3>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Margem Esquerda (%):</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={adminConfig.slotLeft ?? 0}
-                        onChange={(e) => onUpdateAdminConfig({ slotLeft: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-2 py-1 bg-black/80 border border-white/20 rounded text-xs text-amber-300 font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Margem Topo (%):</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={adminConfig.slotTop ?? 0}
-                        onChange={(e) => onUpdateAdminConfig({ slotTop: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-2 py-1 bg-black/80 border border-white/20 rounded text-xs text-amber-300 font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Largura (%):</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={adminConfig.slotWidth ?? 40}
-                        onChange={(e) => onUpdateAdminConfig({ slotWidth: parseFloat(e.target.value) || 40 })}
-                        className="w-full px-2 py-1 bg-black/80 border border-white/20 rounded text-xs text-amber-300 font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Altura (%):</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={adminConfig.slotHeight ?? 40}
-                        onChange={(e) => onUpdateAdminConfig({ slotHeight: parseFloat(e.target.value) || 40 })}
-                        className="w-full px-2 py-1 bg-black/80 border border-white/20 rounded text-xs text-amber-300 font-mono"
-                      />
-                    </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-3 gap-2">
+                    {BOARD_OPTIONS.map((b) => (
+                      <button
+                        key={b.id}
+                        type="button"
+                        onClick={() => {
+                          onUpdateAdminConfig({ boardType: b.id });
+                          if (engineConfig && onUpdateEngineConfig) {
+                            onUpdateEngineConfig({ ...engineConfig, boardType: b.id });
+                          }
+                        }}
+                        className={`p-2 rounded-lg font-black text-xs uppercase transition cursor-pointer border flex flex-col items-center justify-center ${
+                          (adminConfig.boardType || '5x3') === b.id
+                            ? 'bg-gradient-to-r from-red-600 to-amber-600 text-white border-yellow-400 shadow-lg'
+                            : 'bg-black/60 border-white/10 text-gray-400 hover:border-white/30'
+                        }`}
+                      >
+                        <span>{b.label}</span>
+                        <span className="text-[9px] font-normal opacity-80 normal-case">{b.desc}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                {/* SPIN SPEEDS & TIMING CONTROLS */}
-                <div className="bg-black/50 p-3 rounded-xl border border-red-500/20 space-y-3">
+                {/* Formas e Animações de Rolagem (Spin Roll Styles) */}
+                <div className="bg-black/50 p-3.5 rounded-xl border border-red-500/20 space-y-3">
+                  <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Flame className="w-4 h-4 text-amber-400" />
+                    <span>Formas & Efeitos de Rolagem dos Rolos</span>
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {SPIN_ROLL_STYLES.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => onUpdateAdminConfig({ spinRollStyle: s.id })}
+                        className={`p-2.5 rounded-xl text-left transition cursor-pointer border flex items-start gap-2.5 ${
+                          (adminConfig.spinRollStyle || 'standard') === s.id
+                            ? 'bg-gradient-to-r from-amber-950/80 via-black to-red-950/80 border-amber-400 shadow-lg'
+                            : 'bg-black/60 border-white/10 hover:border-white/20'
+                        }`}
+                      >
+                        <span className="text-xl shrink-0 leading-none pt-0.5">{s.icon}</span>
+                        <div>
+                          <div className={`text-xs font-black uppercase ${
+                            (adminConfig.spinRollStyle || 'standard') === s.id ? 'text-amber-300' : 'text-gray-200'
+                          }`}>
+                            {s.label}
+                          </div>
+                          <div className="text-[9px] text-gray-400 leading-tight mt-0.5">
+                            {s.desc}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Full Embedded SlotEngineEditor */}
+                {engineConfig && onUpdateEngineConfig && (
+                  <div className="bg-black/60 p-3.5 rounded-xl border border-red-500/30">
+                    <SlotEngineEditor
+                      engineConfig={engineConfig}
+                      onUpdateEngineConfig={onUpdateEngineConfig}
+                      adminConfig={adminConfig}
+                      onUpdateAdminConfig={onUpdateAdminConfig}
+                    />
+                  </div>
+                )}
+
+                {/* Spin Speeds & Motion Timing */}
+                <div className="bg-black/50 p-3.5 rounded-xl border border-red-500/20 space-y-3">
                   <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                     <Activity className="w-4 h-4 text-amber-400" />
-                    <span>Velocidade da Rolagem (Normal / Turbo)</span>
+                    <span>Velocidades da Rolagem (Normal & Turbo)</span>
                   </h3>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
                     <div>
                       <div className="flex justify-between text-[10px] text-gray-300 font-bold mb-1">
-                        <span>Velocidade Modo Normal:</span>
+                        <span>Duração Giro Normal:</span>
                         <span className="text-amber-300 font-mono">{adminConfig.spinSpeedNormal ?? 1200} ms</span>
                       </div>
                       <input
@@ -548,7 +902,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
 
                     <div>
                       <div className="flex justify-between text-[10px] text-gray-300 font-bold mb-1">
-                        <span>Velocidade Modo Turbo:</span>
+                        <span>Duração Giro Modo Turbo:</span>
                         <span className="text-red-400 font-mono">{adminConfig.spinSpeedTurbo ?? 350} ms</span>
                       </div>
                       <input
@@ -564,7 +918,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
 
                     <div>
                       <div className="flex justify-between text-[10px] text-gray-300 font-bold mb-1">
-                        <span>Intervalo entre Colunas (Stagger):</span>
+                        <span>Atraso entre Colunas (Stagger):</span>
                         <span className="text-yellow-300 font-mono">{adminConfig.reelStaggerDelay ?? 120} ms</span>
                       </div>
                       <input
@@ -580,8 +934,8 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                   </div>
                 </div>
 
-                {/* CASH CARD RULES & ANIMATION SETTINGS */}
-                <div className="bg-black/50 p-3 rounded-xl border border-red-500/20 space-y-3">
+                {/* Cash Card Rules & Threat Glow */}
+                <div className="bg-black/50 p-3.5 rounded-xl border border-red-500/20 space-y-3">
                   <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                     <DollarSign className="w-4 h-4 text-emerald-400" />
                     <span>Regras da Carta de Dinheiro & Animação de Ameaça</span>
@@ -613,13 +967,13 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                         className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
                       />
                       <span className="text-xs text-gray-200 font-bold">
-                        Pagar Carta de Dinheiro Única Isolada (se vier apenas 1 no tabuleiro ela paga seu valor)
+                        Pagar Carta de Dinheiro Única Isolada (Se vier apenas 1 ela paga seu valor)
                       </span>
                     </label>
 
                     <div>
                       <label className="text-[10px] text-gray-300 font-bold block mb-1">
-                        Cor da Animação de Ameaça/Antecipação (Última Coluna):
+                        Cor da Animação de Ameaça/Antecipação na Última Coluna:
                       </label>
                       <div className="grid grid-cols-5 gap-1.5">
                         {[
@@ -645,103 +999,62 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                       </div>
                     </div>
                   </div>
+                </div>
 
-                  {/* REGRAS DE ATIVAÇÃO DO BÔNUS & CARTAS SCATTER */}
-                  <div className="bg-black/50 p-3 rounded-xl border border-yellow-500/30 space-y-3">
-                    <div className="flex items-center justify-between border-b border-yellow-500/20 pb-1.5">
-                      <h3 className="text-xs font-black text-yellow-300 uppercase tracking-wider flex items-center gap-1.5">
-                        <Sparkles className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                        <span>Regras do Bônus & Carta Scatter</span>
-                      </h3>
-                      <span className="text-[9px] bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 px-1.5 py-0.5 rounded font-bold uppercase">
-                        Scatter
-                      </span>
+                {/* Bonus Trigger Rules */}
+                <div className="bg-black/50 p-3.5 rounded-xl border border-yellow-500/30 space-y-3">
+                  <h3 className="text-xs font-black text-yellow-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                    <span>Regras do Bônus & Carta Scatter</span>
+                  </h3>
+
+                  <div className="space-y-2.5">
+                    <div>
+                      <label className="text-[10px] text-gray-300 font-bold block mb-1">
+                        Qual é a Carta Bônus (Scatter Trigger):
+                      </label>
+                      <select
+                        value={adminConfig.bonusTriggerSymbolId || 'crown'}
+                        onChange={(e) => onUpdateAdminConfig({ bonusTriggerSymbolId: e.target.value })}
+                        className="w-full px-2.5 py-1.5 bg-black/80 border border-yellow-500/40 rounded-lg text-xs text-yellow-300 font-bold focus:outline-none cursor-pointer"
+                      >
+                        {SYMBOL_LIST.map((sym) => (
+                          <option key={sym.type} value={sym.type.toLowerCase()}>
+                            {sym.label} ({sym.type})
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
-                    <p className="text-[10px] text-gray-300 leading-snug bg-black/60 p-2 rounded border border-white/5">
-                      💡 Quando cair <strong className="text-yellow-300">3 ou a qtd configurada</strong> da Carta Bônus no slot (em qualquer posição, sem precisar de linha), ativa as <strong className="text-emerald-400">Rodadas Grátis</strong>!
-                    </p>
-
-                    <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="text-[10px] text-gray-300 font-bold block mb-1">
-                          Qual é a Carta Bônus (Scatter Trigger):
-                        </label>
-                        <select
-                          value={adminConfig.bonusTriggerSymbolId || 'crown'}
-                          onChange={(e) => onUpdateAdminConfig({ bonusTriggerSymbolId: e.target.value })}
-                          className="w-full px-2.5 py-1.5 bg-black/80 border border-yellow-500/40 rounded-lg text-xs text-yellow-300 font-bold focus:outline-none cursor-pointer"
-                        >
-                          {SYMBOL_LIST.map((sym) => (
-                            <option key={sym.type} value={sym.type.toLowerCase()}>
-                              {sym.label} ({sym.type})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] text-gray-300 font-bold block mb-1">
-                          Qtd Mínima de Cartas no Tabuleiro para Liberar Bônus:
+                          Qtd Mínima de Cartas:
                         </label>
                         <select
                           value={adminConfig.bonusMinCardsCount ?? 3}
                           onChange={(e) => onUpdateAdminConfig({ bonusMinCardsCount: parseInt(e.target.value) })}
                           className="w-full px-2.5 py-1.5 bg-black/80 border border-yellow-500/40 rounded-lg text-xs text-amber-300 font-bold focus:outline-none cursor-pointer"
                         >
-                          <option value={2}>2 Cartas Bônus no Tabuleiro</option>
-                          <option value={3}>3 Cartas Bônus no Tabuleiro (Padrão)</option>
-                          <option value={4}>4 Cartas Bônus no Tabuleiro</option>
-                          <option value={5}>5 Cartas Bônus no Tabuleiro</option>
+                          <option value={2}>2 Cartas no Tabuleiro</option>
+                          <option value={3}>3 Cartas no Tabuleiro (Padrão)</option>
+                          <option value={4}>4 Cartas no Tabuleiro</option>
+                          <option value={5}>5 Cartas no Tabuleiro</option>
                         </select>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="text-[10px] text-gray-300 font-bold block mb-1">
-                            Qtd de Rodadas Grátis:
-                          </label>
-                          <input
-                            type="number"
-                            min="1"
-                            max="50"
-                            value={adminConfig.bonusFreeSpinsCount ?? 10}
-                            onChange={(e) => onUpdateAdminConfig({ bonusFreeSpinsCount: parseInt(e.target.value) || 10 })}
-                            className="w-full px-2 py-1 bg-black/80 border border-white/20 rounded text-xs text-emerald-300 font-mono font-bold"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] text-gray-300 font-bold block mb-1">
-                            Impulso no Bônus (x):
-                          </label>
-                          <select
-                            value={adminConfig.bonusMultiplierBoost ?? 2}
-                            onChange={(e) => onUpdateAdminConfig({ bonusMultiplierBoost: parseFloat(e.target.value) })}
-                            className="w-full px-2 py-1 bg-black/80 border border-white/20 rounded text-xs text-yellow-300 font-bold"
-                          >
-                            <option value={1}>1x</option>
-                            <option value={2}>2x</option>
-                            <option value={3}>3x</option>
-                            <option value={5}>5x</option>
-                            <option value={10}>10x</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="pt-2 border-t border-white/10 flex items-center justify-between">
-                        <span className="text-[10px] text-gray-300 font-bold">Testar Ativação:</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onUpdateAdminConfig({ forcedOutcome: 'bonus' as any });
-                            alert(`🎯 Próximo giro configurado no Designer para soltar ${adminConfig.bonusMinCardsCount ?? 3} Cartas Bônus!`);
-                          }}
-                          className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-black font-black text-[10px] uppercase rounded shadow cursor-pointer flex items-center gap-1"
-                        >
-                          <Sparkles className="w-3 h-3 fill-black" />
-                          <span>Soltar Bônus no Giro</span>
-                        </button>
+                      <div>
+                        <label className="text-[10px] text-gray-300 font-bold block mb-1">
+                          Qtd de Rodadas Grátis:
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="50"
+                          value={adminConfig.bonusFreeSpinsCount ?? 10}
+                          onChange={(e) => onUpdateAdminConfig({ bonusFreeSpinsCount: parseInt(e.target.value) || 10 })}
+                          className="w-full px-2 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-emerald-300 font-mono font-bold"
+                        />
                       </div>
                     </div>
                   </div>
@@ -749,15 +1062,365 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
               </div>
             )}
 
-            {/* TAB 3: CUSTOM BUTTON CREATOR & STYLES */}
-            {activeTab === 'buttons' && (
+            {/* -------------------------------------------------------------
+                TAB 3: BACKGROUND, FRAME & LAYOUT
+                ------------------------------------------------------------- */}
+            {activeTab === 'screen' && (
               <div className="space-y-4 animate-in fade-in duration-150">
                 
-                {/* Create Button Form */}
+                {/* Background Media */}
+                <div className="bg-black/50 p-3.5 rounded-xl border border-red-500/20 space-y-3">
+                  <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4 text-amber-400" />
+                    <span>Mídia do Fundo (Imagem ou Vídeo MP4)</span>
+                  </h3>
+
+                  <div>
+                    <label className="text-[10px] text-gray-300 font-bold block mb-1">URL da Imagem ou Vídeo (.mp4):</label>
+                    <input
+                      type="text"
+                      value={adminConfig.bgImage}
+                      onChange={(e) => onUpdateAdminConfig({ bgImage: e.target.value })}
+                      placeholder="https://exemplo.com/fundo.png"
+                      className="w-full px-3 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-yellow-300 focus:outline-none focus:border-red-500 font-mono"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Posição X (%):</label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={adminConfig.bgPosX ?? 0}
+                        onChange={(e) => onUpdateAdminConfig({ bgPosX: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-2 py-1 bg-black/80 border border-white/20 rounded text-xs text-yellow-300 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Posição Y (%):</label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={adminConfig.bgPosY ?? 0}
+                        onChange={(e) => onUpdateAdminConfig({ bgPosY: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-2 py-1 bg-black/80 border border-white/20 rounded text-xs text-yellow-300 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-[10px] text-gray-300 font-bold mb-1">
+                      <span>Zoom do Fundo:</span>
+                      <span className="text-amber-300 font-mono">{adminConfig.bgZoom || 100}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="100"
+                      max="300"
+                      value={adminConfig.bgZoom || 100}
+                      onChange={(e) => onUpdateAdminConfig({ bgZoom: parseInt(e.target.value) })}
+                      className="w-full accent-amber-500 cursor-pointer h-1.5"
+                    />
+                  </div>
+                </div>
+
+                {/* Símbolos Flutuantes Mode & Outer Frame */}
+                <div className="bg-gradient-to-r from-red-950/80 via-black to-red-950/80 p-3.5 rounded-xl border-2 border-red-500/50 space-y-3 shadow-lg">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-amber-400 animate-spin" />
+                    <div>
+                      <h3 className="text-xs font-black text-amber-300 uppercase tracking-wider">
+                        Modo Símbolos Flutuantes (Sem Grade / Transparente)
+                      </h3>
+                      <p className="text-[10px] text-gray-300">
+                        Deixa cada elemento/figura transparente sem caixas/quadrados/grades, mantendo a animação perfeita.
+                      </p>
+                    </div>
+                  </div>
+
+                  <label className="flex items-center gap-2.5 p-2 bg-black/80 rounded-lg border border-white/10 cursor-pointer hover:border-amber-400/50 transition">
+                    <input
+                      type="checkbox"
+                      checked={adminConfig.slotHideGrid ?? false}
+                      onChange={(e) => onUpdateAdminConfig({ slotHideGrid: e.target.checked })}
+                      className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                    />
+                    <span className="text-xs font-extrabold text-white">
+                      Remover Grade e Fundo dos Símbolos (Apenas Figura)
+                    </span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 p-2 bg-black/80 rounded-lg border border-white/10 cursor-pointer hover:border-amber-400/50 transition">
+                    <input
+                      type="checkbox"
+                      checked={adminConfig.slotHideOuterFrame ?? false}
+                      onChange={(e) => onUpdateAdminConfig({ slotHideOuterFrame: e.target.checked })}
+                      className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                    />
+                    <span className="text-xs font-extrabold text-white">
+                      Remover Moldura Externa do Quadro
+                    </span>
+                  </label>
+                </div>
+
+                {/* Slot Reel Box Frame Position & Scale */}
+                <div className="bg-black/50 p-3.5 rounded-xl border border-red-500/20 space-y-3">
+                  <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider">
+                    Posicionamento & Tamanho da Moldura do Slot
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Margem Esquerda (%):</label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={adminConfig.slotLeft ?? 4}
+                        onChange={(e) => onUpdateAdminConfig({ slotLeft: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-2 py-1 bg-black/80 border border-white/20 rounded text-xs text-amber-300 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Margem Topo (%):</label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={adminConfig.slotTop ?? 28}
+                        onChange={(e) => onUpdateAdminConfig({ slotTop: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-2 py-1 bg-black/80 border border-white/20 rounded text-xs text-amber-300 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Largura (%):</label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={adminConfig.slotWidth ?? 92}
+                        onChange={(e) => onUpdateAdminConfig({ slotWidth: parseFloat(e.target.value) || 40 })}
+                        className="w-full px-2 py-1 bg-black/80 border border-white/20 rounded text-xs text-amber-300 font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Altura (%):</label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={adminConfig.slotHeight ?? 38}
+                        onChange={(e) => onUpdateAdminConfig({ slotHeight: parseFloat(e.target.value) || 40 })}
+                        className="w-full px-2 py-1 bg-black/80 border border-white/20 rounded text-xs text-amber-300 font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* -------------------------------------------------------------
+                TAB 4: SYMBOLS, ENHANCED UPLOAD & FREE POSITIONING
+                ------------------------------------------------------------- */}
+            {activeTab === 'symbols' && (
+              <div className="space-y-4 animate-in fade-in duration-150">
+                <div className="bg-gradient-to-r from-red-950/80 via-black to-red-950/80 p-3.5 rounded-xl border border-red-500/40 space-y-2">
+                  <h3 className="text-xs font-black text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4 text-amber-400" />
+                    <span>Edição e Manipulação Livre de Símbolos</span>
+                  </h3>
+                  <p className="text-[10px] text-gray-300 leading-relaxed">
+                    💡 Ao enviar uma nova imagem por upload, <strong className="text-amber-300">por padrão ela é carregada por inteiro sem cortes</strong> (<code className="text-yellow-300 font-mono">objectFit: contain</code>). Você pode alterar a escala (zoom), mover e posicioná-la livremente na tela!
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {SYMBOL_LIST.map(({ type, label }) => {
+                    const currentConfig = adminConfig.customSymbolConfigs?.[type] || {
+                      url: adminConfig.customSymbols?.[type] || '',
+                      objectFit: 'contain',
+                      offsetX: 0,
+                      offsetY: 0,
+                      scale: 100,
+                    };
+
+                    const updateSymConfig = (updates: Partial<SymbolImageConfig>) => {
+                      const updatedConfigs = {
+                        ...(adminConfig.customSymbolConfigs || {}),
+                        [type]: { ...currentConfig, ...updates }
+                      };
+                      onUpdateAdminConfig({ customSymbolConfigs: updatedConfigs });
+                    };
+
+                    return (
+                      <div key={type} className="bg-black/60 p-3.5 rounded-xl border border-white/10 space-y-3 hover:border-red-500/40 transition">
+                        
+                        {/* Header with Title & Preview */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-10 h-10 rounded-lg bg-neutral-900 border border-amber-500/40 flex items-center justify-center text-lg overflow-hidden shrink-0 shadow-inner">
+                              <SlotSymbol 
+                                type={type} 
+                                customImage={currentConfig.url} 
+                                symbolConfig={currentConfig}
+                              />
+                            </div>
+                            <div>
+                              <span className="text-xs font-black text-amber-300">{label}</span>
+                              <span className="text-[9px] text-gray-400 block font-mono">ID: {type}</span>
+                            </div>
+                          </div>
+
+                          <label className="px-3 py-1.5 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black text-[10px] uppercase rounded-lg shadow transition cursor-pointer flex items-center gap-1">
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>Upload Imagem</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleFileUploadForSymbol(type, e)}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+
+                        {/* URL Direct Input */}
+                        <div>
+                          <label className="text-[10px] text-gray-400 font-bold block mb-1">URL da Imagem:</label>
+                          <input
+                            type="text"
+                            value={currentConfig.url}
+                            onChange={(e) => {
+                              const url = e.target.value;
+                              const updatedSymbols = { ...adminConfig.customSymbols, [type]: url };
+                              updateSymConfig({ url });
+                              onUpdateAdminConfig({ customSymbols: updatedSymbols });
+                            }}
+                            placeholder="https://exemplo.com/simbolo.png"
+                            className="w-full px-2.5 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-yellow-200 focus:outline-none font-mono"
+                          />
+                        </div>
+
+                        {/* Full Image Controls: Fit Mode, Zoom Scale, Offset X/Y */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-white/10">
+                          
+                          {/* Fit Mode & Scale */}
+                          <div className="space-y-2">
+                            <div>
+                              <label className="text-[10px] text-gray-300 font-bold block mb-1">
+                                Modo de Encaixe:
+                              </label>
+                              <div className="grid grid-cols-2 gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => updateSymConfig({ objectFit: 'contain' })}
+                                  className={`py-1 text-[10px] font-black uppercase rounded border transition ${
+                                    (currentConfig.objectFit || 'contain') === 'contain'
+                                      ? 'bg-amber-500 text-black border-amber-300'
+                                      : 'bg-black/60 text-gray-400 border-white/10'
+                                  }`}
+                                >
+                                  Inteira (Contain)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => updateSymConfig({ objectFit: 'cover' })}
+                                  className={`py-1 text-[10px] font-black uppercase rounded border transition ${
+                                    currentConfig.objectFit === 'cover'
+                                      ? 'bg-amber-500 text-black border-amber-300'
+                                      : 'bg-black/60 text-gray-400 border-white/10'
+                                  }`}
+                                >
+                                  Preencher (Cover)
+                                </button>
+                              </div>
+                            </div>
+
+                            <div>
+                              <div className="flex justify-between text-[10px] font-bold text-gray-300 mb-1">
+                                <span>Aumentar / Zoom Scale:</span>
+                                <span className="text-amber-300 font-mono">{currentConfig.scale || 100}%</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="20"
+                                max="300"
+                                value={currentConfig.scale || 100}
+                                onChange={(e) => updateSymConfig({ scale: parseInt(e.target.value) })}
+                                className="w-full accent-amber-500 cursor-pointer h-1.5"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Free Movement Position Offset X and Offset Y */}
+                          <div className="space-y-2">
+                            <div>
+                              <div className="flex justify-between text-[10px] font-bold text-gray-300 mb-1">
+                                <span>Mover Horizontal (X):</span>
+                                <span className="text-yellow-300 font-mono">{currentConfig.offsetX || 0}%</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="-100"
+                                max="100"
+                                value={currentConfig.offsetX || 0}
+                                onChange={(e) => updateSymConfig({ offsetX: parseInt(e.target.value) })}
+                                className="w-full accent-yellow-400 cursor-pointer h-1.5"
+                              />
+                            </div>
+
+                            <div>
+                              <div className="flex justify-between text-[10px] font-bold text-gray-300 mb-1">
+                                <span>Mover Vertical (Y):</span>
+                                <span className="text-yellow-300 font-mono">{currentConfig.offsetY || 0}%</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="-100"
+                                max="100"
+                                value={currentConfig.offsetY || 0}
+                                onChange={(e) => updateSymConfig({ offsetY: parseInt(e.target.value) })}
+                                className="w-full accent-yellow-400 cursor-pointer h-1.5"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Interactive Drag & Pan Pad */}
+                        <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-2">
+                          <div
+                            onMouseDown={(e) => handleStartDrag(`symbol-pan-${type}`, currentConfig.offsetX || 0, currentConfig.offsetY || 0, e.clientX, e.clientY)}
+                            className="w-full py-2 bg-neutral-900 hover:bg-neutral-800 border border-white/20 rounded-lg text-center cursor-move text-xs font-bold text-amber-300 flex items-center justify-center gap-2 select-none"
+                            title="Clique e arraste para posicionar a imagem livremente"
+                          >
+                            <Move className="w-4 h-4 text-amber-400 animate-bounce" />
+                            <span>Arrastar e Posicionar Imagem Livremente</span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => updateSymConfig({ offsetX: 0, offsetY: 0, scale: 100, objectFit: 'contain' })}
+                            className="px-2.5 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white rounded-lg text-[10px] font-bold shrink-0"
+                            title="Resetar Posição e Zoom"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* -------------------------------------------------------------
+                TAB 5: CUSTOM BUTTON CREATOR
+                ------------------------------------------------------------- */}
+            {activeTab === 'buttons' && (
+              <div className="space-y-4 animate-in fade-in duration-150">
                 <div className="bg-black/50 p-3.5 rounded-xl border border-red-500/20 space-y-3">
                   <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                     <Plus className="w-4 h-4 text-amber-400" />
-                    <span>Adicionar Novo Botão</span>
+                    <span>Adicionar Novo Botão na Tela</span>
                   </h3>
 
                   <div className="space-y-2">
@@ -773,7 +1436,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                     </div>
 
                     <div>
-                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Função do Botão:</label>
+                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Função / Ação do Botão:</label>
                       <select
                         value={btnAction}
                         onChange={(e) => setBtnAction(e.target.value as any)}
@@ -793,7 +1456,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                     </div>
 
                     <div>
-                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Forma / Estilo do Botão:</label>
+                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Forma do Botão:</label>
                       <select
                         value={btnShape}
                         onChange={(e) => setBtnShape(e.target.value as any)}
@@ -807,39 +1470,20 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                     </div>
 
                     <div>
-                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Ícone Interno:</label>
-                      <select
-                        value={btnIcon || 'none'}
-                        onChange={(e) => setBtnIcon(e.target.value === 'none' ? undefined : (e.target.value as any))}
-                        className="w-full px-3 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-amber-300 focus:outline-none"
-                      >
-                        <option value="none">Nenhum Ícone</option>
-                        <option value="play">Play ▶</option>
-                        <option value="zap">Raio Turbo ⚡</option>
-                        <option value="repeat">Giro Repetir 🔄</option>
-                        <option value="plus">Mais (+)</option>
-                        <option value="minus">Menos (-)</option>
-                        <option value="volume">Som 🔊</option>
-                        <option value="settings">Engrenagem ⚙️</option>
-                        <option value="shield">Escudo 🛡️</option>
-                      </select>
-                    </div>
-
-                    <div>
                       <label className="text-[10px] text-gray-300 font-bold block mb-1">URL de Imagem / Logo Customizada (Opcional):</label>
                       <input
                         type="text"
                         value={btnImageUrl}
                         onChange={(e) => setBtnImageUrl(e.target.value)}
                         placeholder="https://exemplo.com/icone.png"
-                        className="w-full px-3 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-white focus:outline-none focus:border-red-500 font-mono"
+                        className="w-full px-3 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-white focus:outline-none font-mono"
                       />
                     </div>
 
                     <button
                       type="button"
                       onClick={handleAddButton}
-                      className="w-full py-2 bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400 active:scale-95 text-white font-black text-xs uppercase tracking-wider rounded-lg shadow-lg transition cursor-pointer"
+                      className="w-full py-2.5 bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-xs uppercase tracking-wider rounded-lg shadow-lg transition cursor-pointer"
                     >
                       + Criar Botão na Tela
                     </button>
@@ -857,7 +1501,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                       <div>
                         <div className="text-xs font-black text-yellow-300">{btn.label}</div>
                         <div className="text-[9px] text-gray-400 font-mono">
-                          Função: {btn.actionType} | X:{btn.posX}% Y:{btn.posY}%
+                          Ação: {btn.actionType} | X:{btn.posX}% Y:{btn.posY}%
                         </div>
                       </div>
 
@@ -865,7 +1509,6 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                         type="button"
                         onClick={() => handleRemoveButton(btn.id)}
                         className="p-1.5 bg-red-950/80 hover:bg-red-600 text-red-300 hover:text-white rounded-lg transition cursor-pointer"
-                        title="Remover Botão"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -875,167 +1518,47 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
               </div>
             )}
 
-            {/* TAB 4: HUD POSITIONS (BALANCE, BET, WIN) */}
+            {/* -------------------------------------------------------------
+                TAB 6: CUSTOM TEXTS & HUD POSITIONING
+                ------------------------------------------------------------- */}
             {activeTab === 'hud' && (
               <div className="space-y-4 animate-in fade-in duration-150">
-                
-                {/* Saldo HUD */}
-                <div className="bg-black/50 p-3 rounded-xl border border-red-500/20 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-emerald-400 uppercase tracking-wider">1. Saldo (Balance)</span>
-                    <label className="flex items-center gap-1 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={adminConfig.showBalance ?? true}
-                        onChange={(e) => onUpdateAdminConfig({ showBalance: e.target.checked })}
-                        className="w-3.5 h-3.5 accent-emerald-500"
-                      />
-                      <span className="text-[10px] text-gray-300 font-bold">Exibir</span>
-                    </label>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Posição X (%):</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={adminConfig.balancePosX ?? 15}
-                        onChange={(e) => onUpdateAdminConfig({ balancePosX: parseFloat(e.target.value) || 15 })}
-                        className="w-full px-2 py-1 bg-black/80 border border-white/20 rounded text-xs text-emerald-300 font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Posição Y (%):</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={adminConfig.balancePosY ?? 8}
-                        onChange={(e) => onUpdateAdminConfig({ balancePosY: parseFloat(e.target.value) || 8 })}
-                        className="w-full px-2 py-1 bg-black/80 border border-white/20 rounded text-xs text-emerald-300 font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Aposta HUD */}
-                <div className="bg-black/50 p-3 rounded-xl border border-red-500/20 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-amber-400 uppercase tracking-wider">2. Aposta (Bet)</span>
-                    <label className="flex items-center gap-1 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={adminConfig.showBetController ?? true}
-                        onChange={(e) => onUpdateAdminConfig({ showBetController: e.target.checked })}
-                        className="w-3.5 h-3.5 accent-amber-500"
-                      />
-                      <span className="text-[10px] text-gray-300 font-bold">Exibir</span>
-                    </label>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Posição X (%):</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={adminConfig.betPosX ?? 85}
-                        onChange={(e) => onUpdateAdminConfig({ betPosX: parseFloat(e.target.value) || 85 })}
-                        className="w-full px-2 py-1 bg-black/80 border border-white/20 rounded text-xs text-amber-300 font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Posição Y (%):</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={adminConfig.betPosY ?? 8}
-                        onChange={(e) => onUpdateAdminConfig({ betPosY: parseFloat(e.target.value) || 8 })}
-                        className="w-full px-2 py-1 bg-black/80 border border-white/20 rounded text-xs text-amber-300 font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Banner Vitória HUD */}
-                <div className="bg-black/50 p-3 rounded-xl border border-red-500/20 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-yellow-400 uppercase tracking-wider">3. Vitória (Win Banner)</span>
-                    <label className="flex items-center gap-1 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={adminConfig.showWinBanner ?? true}
-                        onChange={(e) => onUpdateAdminConfig({ showWinBanner: e.target.checked })}
-                        className="w-3.5 h-3.5 accent-yellow-500"
-                      />
-                      <span className="text-[10px] text-gray-300 font-bold">Exibir</span>
-                    </label>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Posição X (%):</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={adminConfig.winPosX ?? 50}
-                        onChange={(e) => onUpdateAdminConfig({ winPosX: parseFloat(e.target.value) || 50 })}
-                        className="w-full px-2 py-1 bg-black/80 border border-white/20 rounded text-xs text-yellow-300 font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Posição Y (%):</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={adminConfig.winPosY ?? 82}
-                        onChange={(e) => onUpdateAdminConfig({ winPosY: parseFloat(e.target.value) || 82 })}
-                        className="w-full px-2 py-1 bg-black/80 border border-white/20 rounded text-xs text-yellow-300 font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 5: CUSTOM TEXTS */}
-            {activeTab === 'text' && (
-              <div className="space-y-4 animate-in fade-in duration-150">
-                <div className="bg-black/50 p-3 rounded-xl border border-red-500/20 space-y-3">
+                {/* Create Custom Text */}
+                <div className="bg-black/50 p-3.5 rounded-xl border border-red-500/20 space-y-3">
                   <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                     <TypeIcon className="w-4 h-4 text-amber-400" />
-                    <span>Adicionar Texto na Tela</span>
+                    <span>Adicionar Texto Customizado</span>
                   </h3>
 
                   <div className="space-y-2">
                     <div>
-                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Texto:</label>
+                      <label className="text-[10px] text-gray-300 font-bold block mb-1">Texto Exibido:</label>
                       <input
                         type="text"
                         value={newText}
                         onChange={(e) => setNewText(e.target.value)}
-                        placeholder="Ex: MEGA BÔNUS"
+                        placeholder="Ex: MEGA PRÊMIO"
                         className="w-full px-3 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-white focus:outline-none"
                       />
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="text-[10px] text-gray-300 font-bold block mb-1">Tamanho (px):</label>
+                        <label className="text-[10px] text-gray-300 font-bold block mb-1">Tamanho da Fonte (px):</label>
                         <input
                           type="number"
                           value={newTextSize}
                           onChange={(e) => setNewTextSize(parseInt(e.target.value) || 14)}
-                          className="w-full px-2 py-1 bg-black/80 border border-white/20 rounded text-xs text-yellow-300 font-mono"
+                          className="w-full px-2.5 py-1 bg-black/80 border border-white/20 rounded text-xs text-yellow-300 font-mono"
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] text-gray-300 font-bold block mb-1">Cor do Texto:</label>
+                        <label className="text-[10px] text-gray-300 font-bold block mb-1">Cor do Texto (Hex):</label>
                         <input
                           type="color"
                           value={newTextColor}
                           onChange={(e) => setNewTextColor(e.target.value)}
-                          className="w-full h-7 bg-black border border-white/20 rounded cursor-pointer"
+                          className="w-full h-7 bg-black/80 border border-white/20 rounded cursor-pointer"
                         />
                       </div>
                     </div>
@@ -1043,9 +1566,9 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                     <button
                       type="button"
                       onClick={handleAddText}
-                      className="w-full py-2 bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400 active:scale-95 text-white font-black text-xs uppercase tracking-wider rounded-lg transition cursor-pointer"
+                      className="w-full py-2.5 bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-xs uppercase tracking-wider rounded-lg shadow-lg transition cursor-pointer"
                     >
-                      + Adicionar Texto no Jogo
+                      + Criar Texto na Tela
                     </button>
                   </div>
                 </div>
@@ -1053,7 +1576,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                 {/* List of Custom Texts */}
                 <div className="space-y-2">
                   <h4 className="text-[11px] font-black text-gray-300 uppercase tracking-wider">
-                    Textos Adicionados ({adminConfig.customTexts?.length || 0}):
+                    Textos Criados ({adminConfig.customTexts?.length || 0}):
                   </h4>
 
                   {(adminConfig.customTexts || []).map((txt) => (
@@ -1077,57 +1600,17 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                 </div>
               </div>
             )}
-
-            {/* TAB 6: CUSTOM SYMBOLS */}
-            {activeTab === 'symbols' && (
-              <div className="space-y-3 animate-in fade-in duration-150">
-                <h3 className="text-xs font-black text-amber-400 uppercase tracking-wider">
-                  Símbolos das Rodadas
-                </h3>
-
-                {SYMBOL_LIST.map(({ type, label }) => {
-                  const currentConfig = adminConfig.customSymbolConfigs?.[type] || { url: adminConfig.customSymbols?.[type] || '' };
-                  return (
-                    <div key={type} className="bg-black/50 p-2.5 rounded-xl border border-white/10 space-y-1.5">
-                      <span className="text-xs font-bold text-yellow-300">{label} ({type})</span>
-                      <input
-                        type="text"
-                        value={currentConfig.url}
-                        onChange={(e) => {
-                          const url = e.target.value;
-                          const updatedSymbols = { ...adminConfig.customSymbols, [type]: url };
-                          const updatedConfigs = { 
-                            ...adminConfig.customSymbolConfigs, 
-                            [type]: { ...currentConfig, url } 
-                          };
-                          onUpdateAdminConfig({
-                            customSymbols: updatedSymbols,
-                            customSymbolConfigs: updatedConfigs,
-                          });
-                        }}
-                        placeholder="https://exemplo.com/simbolo.png"
-                        className="w-full px-2.5 py-1 bg-black/80 border border-white/20 rounded text-xs text-white focus:outline-none"
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Right Studio Canvas: Interactive Phone Simulator (8 Cols) */}
+        {/* Right Studio Canvas: Interactive Live Simulator Stage (7 Cols) */}
         <div 
           ref={previewCanvasRef}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
-          className="lg:col-span-8 bg-[#050609] p-4 flex flex-col items-center justify-center relative overflow-hidden select-none"
+          className="lg:col-span-7 bg-[#040508] p-4 flex flex-col items-center justify-center relative overflow-hidden select-none min-h-[500px]"
         >
-          
-          {/* Subtle Background Studio Grid Pattern */}
-          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(#1e202e_1px,transparent_1px)] [background-size:20px_20px] opacity-40" />
-
           {/* Alignment Crosshairs Overlay */}
           {showGridLines && (
             <div className="absolute inset-0 pointer-events-none z-10">
@@ -1141,12 +1624,84 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
             </div>
           )}
 
-          {/* Interactive Phone Simulator Frame */}
+          {/* Preview Control Header: Tabuleiro e Rolagem Selector Bar */}
+          <div className="w-full max-w-[420px] bg-black/90 backdrop-blur-md border border-amber-500/40 rounded-2xl p-2.5 mb-3 shadow-[0_0_30px_rgba(245,158,11,0.15)] z-30 space-y-2">
+            <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
+              <div className="flex items-center gap-1.5">
+                <div className="p-1 rounded bg-amber-500/20 text-amber-300">
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                </div>
+                <span className="text-[11px] font-black uppercase text-amber-300 tracking-wider">
+                  Tabuleiro Ativo: <b className="text-white font-mono">{activeBoardType}</b> ({activeBoardDims.cols} Colunas × {activeBoardDims.rows} Linhas)
+                </span>
+              </div>
+
+              <span className="text-[9px] font-black uppercase text-amber-300 bg-amber-950/90 px-2 py-0.5 rounded-full border border-amber-500/40 flex items-center gap-1 shadow-sm">
+                <span>{activeRollStyle.icon}</span>
+                <span>{activeRollStyle.label}</span>
+              </span>
+            </div>
+
+            {/* Fast Swap Board Pills */}
+            <div>
+              <div className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center justify-between">
+                <span>Trocar Tabuleiro Ativo no Preview:</span>
+                <span className="text-amber-400 font-mono text-[8px]">Clique p/ alternar</span>
+              </div>
+              <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none">
+                {BOARD_OPTIONS.map((b) => (
+                  <button
+                    key={b.id}
+                    type="button"
+                    onClick={() => {
+                      onUpdateAdminConfig({ boardType: b.id });
+                      if (engineConfig && onUpdateEngineConfig) {
+                        onUpdateEngineConfig({ ...engineConfig, boardType: b.id });
+                      }
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold shrink-0 border transition cursor-pointer ${
+                      activeBoardType === b.id
+                        ? 'bg-gradient-to-r from-red-600 via-amber-600 to-yellow-500 text-white border-yellow-300 shadow-md scale-105'
+                        : 'bg-neutral-900/90 text-gray-300 border-white/10 hover:border-amber-400/50 hover:text-amber-300'
+                    }`}
+                  >
+                    {b.id}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Fast Swap Spin Roll Style Pills */}
+            <div className="pt-1.5 border-t border-white/10">
+              <div className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                <span>Efeito de Rolagem dos Rolos:</span>
+              </div>
+              <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-none">
+                {SPIN_ROLL_STYLES.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => onUpdateAdminConfig({ spinRollStyle: s.id })}
+                    className={`px-2 py-0.5 rounded-full text-[9px] font-black shrink-0 border transition cursor-pointer flex items-center gap-1 ${
+                      (adminConfig.spinRollStyle || 'standard') === s.id
+                        ? 'bg-amber-400 text-black border-yellow-200 shadow-sm scale-105'
+                        : 'bg-neutral-900 text-gray-400 border-white/10 hover:text-white'
+                    }`}
+                  >
+                    <span>{s.icon}</span>
+                    <span>{s.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Phone Simulator Frame */}
           <div 
             style={{ width: `${phoneWidth}px` }}
-            className="relative aspect-[9/16] bg-black rounded-[38px] border-[8px] border-neutral-800 overflow-hidden shadow-[0_0_60px_rgba(239,68,68,0.25)] flex flex-col justify-between z-20 transition-all duration-200"
+            className="relative aspect-[9/16] bg-black rounded-[38px] border-[8px] border-neutral-800 overflow-hidden shadow-[0_0_60px_rgba(239,68,68,0.3)] flex flex-col justify-between z-20 transition-all duration-200"
           >
-            {/* Phone Speaker Notch */}
+            {/* Speaker Notch */}
             <div className="absolute top-2 left-1/2 -translate-x-1/2 w-20 h-3 bg-neutral-900 rounded-full z-40 flex items-center justify-center">
               <div className="w-8 h-1 bg-neutral-700 rounded-full" />
             </div>
@@ -1162,33 +1717,28 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
 
             {/* Draggable Slot Frame */}
             <div
-              onMouseDown={(e) => handleStartDrag('slot', adminConfig.slotLeft ?? 0, adminConfig.slotTop ?? 0, e.clientX, e.clientY)}
+              onMouseDown={(e) => handleStartDrag('slot', adminConfig.slotLeft ?? 4, adminConfig.slotTop ?? 28, e.clientX, e.clientY)}
               style={{
                 top: `${adminConfig.slotTop ?? 28}%`,
                 left: `${adminConfig.slotLeft ?? 4}%`,
                 width: `${adminConfig.slotWidth ?? 92}%`,
                 height: `${adminConfig.slotHeight ?? 38}%`,
-                borderColor: adminConfig.slotHideOuterFrame ? 'transparent' : (adminConfig.slotFrameColor ?? '#ffb700'),
-                borderWidth: adminConfig.slotHideOuterFrame ? '0px' : `${adminConfig.slotFrameBorderWidth ?? 4}px`,
-                backgroundColor: adminConfig.slotHideOuterFrame ? 'transparent' : (adminConfig.slotFrameBgColor ?? 'rgba(0,0,0,0.65)'),
-                borderStyle: adminConfig.slotHideOuterFrame ? 'none' : ((adminConfig.slotFrameBorderWidth ?? 4) > 0 ? 'solid' : 'none'),
+                borderColor: adminConfig.slotHideOuterFrame ? 'transparent' : '#ffb700',
+                borderWidth: adminConfig.slotHideOuterFrame ? '0px' : '4px',
+                backgroundColor: adminConfig.slotHideOuterFrame ? 'transparent' : 'rgba(0,0,0,0.65)',
                 boxShadow: adminConfig.slotHideOuterFrame ? 'none' : '0 10px 35px rgba(0,0,0,0.8)',
               }}
-              className="absolute cursor-move z-20 flex items-center justify-center rounded-2xl transition-all p-1 overflow-hidden"
+              className="absolute cursor-move z-20 flex items-center justify-center rounded-2xl transition-all p-1 overflow-hidden border-solid"
             >
               <div className="w-full h-full pointer-events-none">
                 <SlotMachine 
                   isSpinning={gameState.isSpinning} 
-                  grid={[
-                    ['Castle', 'Sword', 'Diamond', 'Crown', 'Lion'],
-                    ['Shield', 'Queen', 'Dragon', 'King', 'Coin'],
-                    ['Lion', 'Diamond', 'Castle', 'Sword', 'Crown']
-                  ]} 
+                  grid={previewGrid} 
                   customSymbols={adminConfig.customSymbols}
                   customSymbolConfigs={adminConfig.customSymbolConfigs}
                   slotHideGrid={adminConfig.slotHideGrid}
-                  noSlotMargins={adminConfig.noSlotMargins}
                   cashAnticipationColor={adminConfig.cashAnticipationColor ?? 'gold'}
+                  spinRollStyle={adminConfig.spinRollStyle ?? 'standard'}
                 />
               </div>
             </div>
@@ -1202,13 +1752,13 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                   left: '50%',
                   transform: 'translateX(-50%)',
                 }}
-                className="z-20 px-3.5 py-1 bg-gradient-to-r from-yellow-500 via-amber-500 to-yellow-600 text-black font-black text-[10px] rounded-full shadow-[0_4px_15px_rgba(245,158,11,0.4)] border border-yellow-300 uppercase tracking-wider flex items-center gap-1 cursor-pointer pointer-events-none select-none"
+                className="z-20 px-3.5 py-1 bg-gradient-to-r from-yellow-500 via-amber-500 to-yellow-600 text-black font-black text-[10px] rounded-full shadow-[0_4px_15px_rgba(245,158,11,0.4)] border border-yellow-300 uppercase tracking-wider flex items-center gap-1 pointer-events-none select-none"
               >
                 <span>⭐ Comprar Bônus (x{adminConfig.buyBonusMultiplier ?? 50})</span>
               </div>
             )}
 
-            {/* Draggable Spin Button Cluster (Turbo + Spin + Auto) */}
+            {/* Draggable Spin Button Cluster */}
             <div
               onMouseDown={(e) => handleStartDrag('spin', adminConfig.spinLeft ?? 50, 100 - (adminConfig.spinBottom ?? 4), e.clientX, e.clientY)}
               style={{
@@ -1216,15 +1766,13 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                 left: `${adminConfig.spinLeft ?? 50}%`,
                 transform: `translateX(-50%) scale(${(adminConfig.spinScale ?? 100) / 100})`,
               }}
-              className="absolute z-30 cursor-move flex items-center justify-center gap-2 transition-all duration-100 active:scale-95 select-none"
+              className="absolute z-30 cursor-move flex items-center justify-center gap-2 transition-all duration-100 select-none"
             >
-              {/* TURBO BUTTON PREVIEW */}
               <div className="w-9 h-9 rounded-full border border-white/10 bg-black/60 text-gray-400 flex flex-col items-center justify-center shadow-md">
                 <Zap className="w-3.5 h-3.5 text-amber-400" />
                 <span className="text-[7px] font-black uppercase leading-none mt-0.5">Turbo</span>
               </div>
 
-              {/* MAIN SPIN BUTTON */}
               <SpinButton 
                 onSpin={onSpin} 
                 isSpinning={gameState.isSpinning}
@@ -1232,146 +1780,52 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                 color={adminConfig.spinButtonColor || 'gold'}
               />
 
-              {/* AUTO SPIN BUTTON PREVIEW */}
               <div className="w-9 h-9 rounded-full border border-white/10 bg-black/60 text-gray-400 flex flex-col items-center justify-center shadow-md">
                 <Play className="w-3.5 h-3.5 fill-current text-gray-400" />
                 <span className="text-[7px] font-black uppercase leading-none mt-0.5">Auto</span>
               </div>
             </div>
 
-            {/* Draggable Saldo (Balance) HUD */}
-            {adminConfig.showBalance !== false && (
-              <div
-                onMouseDown={(e) => handleStartDrag('balance', adminConfig.balancePosX ?? 15, adminConfig.balancePosY ?? 8, e.clientX, e.clientY)}
-                style={{
-                  top: `${adminConfig.balancePosY ?? 8}%`,
-                  left: `${adminConfig.balancePosX ?? 15}%`,
-                  transform: 'translate(-50%, -50%)',
-                }}
-                className="absolute z-30 cursor-move flex items-center gap-1.5 bg-black/80 backdrop-blur-md px-2.5 py-1 rounded-xl border border-[#d4af37]/50 shadow-lg text-white"
-              >
-                <Coins className="w-3.5 h-3.5 text-yellow-400" />
-                <div className="flex flex-col">
-                  <span className="text-[8px] text-yellow-500 font-bold uppercase tracking-wider leading-none">Saldo</span>
-                  <span className="text-xs font-extrabold text-white leading-tight">
-                    R$ {gameState.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Draggable Aposta (Bet) HUD */}
-            {adminConfig.showBetController !== false && (
-              <div
-                onMouseDown={(e) => handleStartDrag('bet', adminConfig.betPosX ?? 85, adminConfig.betPosY ?? 8, e.clientX, e.clientY)}
-                style={{
-                  top: `${adminConfig.betPosY ?? 8}%`,
-                  left: `${adminConfig.betPosX ?? 85}%`,
-                  transform: 'translate(-50%, -50%)',
-                }}
-                className="absolute z-30 cursor-move flex items-center bg-black/80 backdrop-blur-md px-2 py-1 rounded-xl border border-[#8b6914]/50 gap-1 shadow-lg text-white"
-              >
-                <div className="w-4 h-4 rounded bg-[#8b6914]/40 flex items-center justify-center text-white">
-                  <Minus className="w-2.5 h-2.5" />
-                </div>
-                <div className="flex flex-col items-center px-0.5">
-                  <span className="text-[8px] text-gray-400 uppercase font-bold leading-none">Aposta</span>
-                  <span className="text-xs font-bold text-yellow-300 leading-tight">R$ {gameState.bet.toFixed(2)}</span>
-                </div>
-                <div className="w-4 h-4 rounded bg-[#8b6914]/40 flex items-center justify-center text-white">
-                  <Plus className="w-2.5 h-2.5" />
-                </div>
-              </div>
-            )}
-
-            {/* Draggable Win Banner HUD */}
-            {adminConfig.showWinBanner !== false && (
-              <div
-                onMouseDown={(e) => handleStartDrag('win', adminConfig.winPosX ?? 50, adminConfig.winPosY ?? 82, e.clientX, e.clientY)}
-                style={{
-                  top: `${adminConfig.winPosY ?? 82}%`,
-                  left: `${adminConfig.winPosX ?? 50}%`,
-                  transform: 'translate(-50%, -50%)',
-                }}
-                className="absolute z-30 w-[85%] bg-gradient-to-r from-yellow-700/90 via-black/95 to-yellow-700/90 border-2 border-yellow-400 p-2 rounded-xl text-center shadow-[0_4px_25px_rgba(251,191,36,0.6)] cursor-move select-none"
-              >
-                <span className="text-[9px] text-yellow-300 font-extrabold uppercase tracking-widest block leading-none mb-0.5 animate-pulse">
-                  Linha Vencedora! (1/3)
-                </span>
-                <span className="text-xs font-black text-white uppercase block leading-tight">
-                  5x Símbolos Combinados
-                </span>
-                <span className="text-xs font-extrabold text-amber-300 font-mono block leading-none mt-0.5">
-                  +R$ 50,00 (x50)
-                </span>
-              </div>
-            )}
-
             {/* Draggable Custom Buttons */}
-            {(adminConfig.customButtons || []).map((btn) => {
-              if (!btn.isActive) return null;
-              return (
-                <div
-                  key={btn.id}
-                  onMouseDown={(e) => handleStartDrag(`button-${btn.id}`, btn.posX, btn.posY, e.clientX, e.clientY)}
-                  style={{
-                    left: `${btn.posX}%`,
-                    top: `${btn.posY}%`,
-                    transform: `translate(-50%, -50%) scale(${(btn.scale || 100) / 100})`,
-                  }}
-                  className={`absolute z-30 cursor-move font-black text-[10px] uppercase shadow-xl border border-white/20 whitespace-nowrap active:scale-95 transition-transform flex items-center justify-center gap-1.5 ${
-                    btn.shape === 'pill'
-                      ? 'rounded-full px-3.5 py-1.5'
-                      : btn.shape === 'circle'
-                      ? 'rounded-full w-10 h-10 p-0 flex items-center justify-center'
-                      : 'rounded-xl px-3.5 py-1.5'
-                  } ${btn.bgColor || 'bg-gradient-to-r from-amber-500 to-yellow-400'} ${btn.textColor || 'text-black font-black'}`}
-                >
-                  {btn.icon === 'play' && <Play className="w-3.5 h-3.5 fill-current" />}
-                  {btn.icon === 'zap' && <Zap className="w-3.5 h-3.5 fill-current" />}
-                  {btn.icon === 'repeat' && <RotateCcw className="w-3.5 h-3.5" />}
-                  {btn.icon === 'plus' && <Plus className="w-3.5 h-3.5" />}
-                  {btn.icon === 'minus' && <Minus className="w-3.5 h-3.5" />}
-                  {btn.icon === 'volume' && <Volume2 className="w-3.5 h-3.5" />}
-                  {btn.icon === 'settings' && <Settings className="w-3.5 h-3.5" />}
-                  {btn.icon === 'shield' && <Shield className="w-3.5 h-3.5" />}
-                  {btn.imageUrl && (
-                    <img src={btn.imageUrl} alt="" className="w-4 h-4 object-contain" />
-                  )}
-                  {btn.shape !== 'circle' && <span>{btn.label}</span>}
-                </div>
-              );
-            })}
+            {(adminConfig.customButtons || []).map((btn) => (
+              <div
+                key={btn.id}
+                onMouseDown={(e) => handleStartDrag(`button-${btn.id}`, btn.posX, btn.posY, e.clientX, e.clientY)}
+                style={{
+                  position: 'absolute',
+                  top: `${btn.posY}%`,
+                  left: `${btn.posX}%`,
+                  transform: `translate(-50%, -50%) scale(${btn.scale / 100})`,
+                }}
+                className={`z-30 cursor-move px-3 py-1.5 rounded-full text-xs font-black text-black shadow-lg border border-amber-300 flex items-center gap-1.5 ${btn.bgColor}`}
+              >
+                {btn.imageUrl && (
+                  <img src={btn.imageUrl} alt={btn.label} className="w-4 h-4 object-contain rounded" />
+                )}
+                <span>{btn.label}</span>
+              </div>
+            ))}
 
             {/* Draggable Custom Texts */}
-            {(adminConfig.customTexts || []).map((txt) => {
-              if (!txt.isActive) return null;
-              return (
-                <div
-                  key={txt.id}
-                  onMouseDown={(e) => handleStartDrag(`text-${txt.id}`, txt.posX, txt.posY, e.clientX, e.clientY)}
-                  style={{
-                    left: `${txt.posX}%`,
-                    top: `${txt.posY}%`,
-                    transform: 'translate(-50%, -50%)',
-                    fontSize: `${txt.fontSize}px`,
-                    color: txt.color,
-                  }}
-                  className="absolute z-30 cursor-move font-extrabold shadow-sm select-none whitespace-nowrap"
-                >
-                  {txt.text}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Floating Instructions Footer */}
-          <div className="absolute bottom-3 bg-black/80 backdrop-blur px-4 py-1.5 rounded-full border border-white/10 text-[10px] text-gray-300 font-mono shadow-xl flex items-center gap-2 pointer-events-none">
-            <Move className="w-3.5 h-3.5 text-amber-400" />
-            <span>Arraste qualquer elemento na tela do celular para ajustar em tempo real</span>
+            {(adminConfig.customTexts || []).map((txt) => (
+              <div
+                key={txt.id}
+                onMouseDown={(e) => handleStartDrag(`text-${txt.id}`, txt.posX, txt.posY, e.clientX, e.clientY)}
+                style={{
+                  position: 'absolute',
+                  top: `${txt.posY}%`,
+                  left: `${txt.posX}%`,
+                  transform: 'translate(-50%, -50%)',
+                  fontSize: `${txt.fontSize}px`,
+                  color: txt.color,
+                }}
+                className="z-30 cursor-move font-black tracking-wider uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
+              >
+                {txt.text}
+              </div>
+            ))}
           </div>
         </div>
-
       </div>
     </div>
   );

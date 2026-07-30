@@ -42,6 +42,9 @@ export interface CustomButtonConfig {
   isActive: boolean;
 }
 
+export type BoardType = '3x1' | '3x3' | '4x3' | '4x4' | '5x3' | '5x4' | '6x3' | '6x4' | '7x7';
+export type SpinRollStyle = 'standard' | 'cascade' | 'bounce_rebound' | 'hyper_blur' | 'scale_pop' | 'wave_swing';
+
 export interface AdminConfig {
   targetRtp: number;
   volatility: 'low' | 'medium' | 'high';
@@ -97,7 +100,8 @@ export interface AdminConfig {
   // Custom Symbol Images (SymbolType -> URL/DataURI)
   customSymbols: Partial<Record<SymbolType, string>>;
   customSymbolConfigs?: Partial<Record<SymbolType, SymbolImageConfig>>;
-  boardType?: '5x3' | '3x3' | '5x4' | '3x1';
+  boardType?: BoardType;
+  spinRollStyle?: SpinRollStyle;
 
   // Custom Cash Multiplier and specific images configuration
   customCashMultipliers?: number[];

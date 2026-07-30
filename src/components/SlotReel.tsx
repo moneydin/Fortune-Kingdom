@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, useAnimation } from 'motion/react';
-import { SymbolType, SymbolImageConfig } from '../types';
+import { SymbolType, SymbolImageConfig, SpinRollStyle } from '../types';
 import { SlotSymbol } from './SlotSymbol';
 
 interface SlotReelProps {
@@ -20,6 +20,7 @@ interface SlotReelProps {
   bonusPulsingRows?: number[];
   slotHideGrid?: boolean;
   anticipationColor?: 'gold' | 'red' | 'purple' | 'cyan' | 'neon_green';
+  spinRollStyle?: SpinRollStyle;
 }
 
 const ALL_SYMBOLS: string[] = ['King', 'Queen', 'Crown', 'Lion', 'Sword', 'Shield', 'Castle', 'Diamond', 'Coin', 'Dragon'];
@@ -73,7 +74,8 @@ export const SlotReel: React.FC<SlotReelProps> = ({
   anticipationStartDelay = 0,
   bonusPulsingRows = [],
   slotHideGrid = false,
-  anticipationColor = 'gold'
+  anticipationColor = 'gold',
+  spinRollStyle = 'standard'
 }) => {
   const [currentSymbols, setCurrentSymbols] = useState<string[]>(resultSymbols);
   const [reelSpinning, setReelSpinning] = useState<boolean>(false);
@@ -99,17 +101,49 @@ export const SlotReel: React.FC<SlotReelProps> = ({
     if (isSpinning) {
       setReelSpinning(true);
       setShowAnticipationGlow(false);
-      controls.start({
-        y: ["0%", "-80%"],
-        transition: {
-          y: {
-            repeat: Infinity,
-            repeatType: "loop",
-            duration: 0.3,
-            ease: "linear",
+
+      if (spinRollStyle === 'cascade') {
+        controls.start({
+          y: ["-80%", "0%"],
+          transition: { repeat: Infinity, duration: 0.22, ease: "linear" }
+        });
+      } else if (spinRollStyle === 'bounce_rebound') {
+        controls.start({
+          y: ["0%", "-80%"],
+          transition: { repeat: Infinity, duration: 0.35, ease: "linear" }
+        });
+      } else if (spinRollStyle === 'hyper_blur') {
+        controls.start({
+          y: ["0%", "-80%"],
+          opacity: [0.8, 1, 0.8],
+          transition: { repeat: Infinity, duration: 0.16, ease: "linear" }
+        });
+      } else if (spinRollStyle === 'scale_pop') {
+        controls.start({
+          y: ["0%", "-80%"],
+          scale: [0.95, 1.05, 0.95],
+          transition: { repeat: Infinity, duration: 0.28, ease: "linear" }
+        });
+      } else if (spinRollStyle === 'wave_swing') {
+        controls.start({
+          y: ["0%", "-80%"],
+          x: ["-3px", "3px", "-3px"],
+          transition: { repeat: Infinity, duration: 0.32, ease: "linear" }
+        });
+      } else {
+        // Standard vertical spin
+        controls.start({
+          y: ["0%", "-80%"],
+          transition: {
+            y: {
+              repeat: Infinity,
+              repeatType: "loop",
+              duration: 0.3,
+              ease: "linear",
+            }
           }
-        }
-      });
+        });
+      }
     } else {
       if (isAnticipating) {
         antTimerRef.current = setTimeout(() => {
@@ -122,11 +156,46 @@ export const SlotReel: React.FC<SlotReelProps> = ({
         setCurrentSymbols(resultSymbols);
         setReelSpinning(false);
         setShowAnticipationGlow(false);
-        controls.set({ y: -12 });
-        controls.start({
-          y: 0,
-          transition: { type: "spring", stiffness: 400, damping: 25 }
-        });
+
+        if (spinRollStyle === 'cascade') {
+          controls.set({ y: -45, x: 0 });
+          controls.start({
+            y: 0,
+            transition: { type: "spring", stiffness: 500, damping: 14 }
+          });
+        } else if (spinRollStyle === 'bounce_rebound') {
+          controls.set({ y: -30, x: 0 });
+          controls.start({
+            y: 0,
+            transition: { type: "spring", stiffness: 280, damping: 10, mass: 1.2 }
+          });
+        } else if (spinRollStyle === 'hyper_blur') {
+          controls.set({ y: -10, x: 0, opacity: 1 });
+          controls.start({
+            y: 0,
+            transition: { type: "spring", stiffness: 600, damping: 30 }
+          });
+        } else if (spinRollStyle === 'scale_pop') {
+          controls.set({ y: -12, scale: 0.5, x: 0 });
+          controls.start({
+            y: 0,
+            scale: 1,
+            transition: { type: "spring", stiffness: 450, damping: 18 }
+          });
+        } else if (spinRollStyle === 'wave_swing') {
+          controls.set({ y: -15, x: 8 });
+          controls.start({
+            y: 0,
+            x: 0,
+            transition: { type: "spring", stiffness: 350, damping: 20 }
+          });
+        } else {
+          controls.set({ y: -12, x: 0, scale: 1 });
+          controls.start({
+            y: 0,
+            transition: { type: "spring", stiffness: 400, damping: 25 }
+          });
+        }
       }, Math.max(0, delay));
     }
 
@@ -140,7 +209,7 @@ export const SlotReel: React.FC<SlotReelProps> = ({
         antTimerRef.current = null;
       }
     };
-  }, [isSpinning, resultSymbols, delay, anticipationStartDelay, isAnticipating, controls]);
+  }, [isSpinning, resultSymbols, delay, anticipationStartDelay, isAnticipating, controls, spinRollStyle]);
 
   const spinPool = activeSymbols.length > 0 ? activeSymbols : ALL_SYMBOLS;
   const spinningColumn = Array.from({ length: totalSpinningItems }).map((_, i) => {

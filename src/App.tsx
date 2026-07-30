@@ -1156,6 +1156,7 @@ export default function App() {
             staggerDelay={gameSettings.turboMode ? Math.max(30, Math.floor((adminConfig.reelStaggerDelay ?? 120) / 3)) : (adminConfig.reelStaggerDelay ?? 120)}
             anticipationExtraDelay={gameSettings.turboMode ? 800 : 2000}
             cashAnticipationColor={adminConfig.cashAnticipationColor ?? 'gold'}
+            spinRollStyle={adminConfig.spinRollStyle ?? 'standard'}
           />
         </div>
 
@@ -1818,6 +1819,13 @@ export default function App() {
         gameState={gameState}
         onSpin={handleSpin}
         onUpdateGameState={(updates) => setGameState(prev => ({ ...prev, ...updates }))}
+        engineConfig={engineConfig}
+        onUpdateEngineConfig={(newConfig) => {
+          setEngineConfig(newConfig);
+          saveEngineConfig(newConfig);
+        }}
+        onUpdateBalance={(newBalance) => setGameState(prev => ({ ...prev, balance: newBalance }))}
+        onResetStats={() => setAdminConfig(prev => ({ ...prev, totalSpins: 0, totalWagered: 0, totalPayout: 0 }))}
       />
 
     </div>

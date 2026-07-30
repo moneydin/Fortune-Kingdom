@@ -1,3 +1,5 @@
+import { BoardType } from './types';
+
 export interface SlotSymbolConfig {
   id: string;
   name: string;
@@ -17,7 +19,7 @@ export interface PaylineConfig {
 }
 
 export interface SlotEngineConfig {
-  boardType: '3x1' | '3x3' | '5x3' | '5x4';
+  boardType: BoardType;
   symbols: SlotSymbolConfig[];
   paylines: PaylineConfig[];
   targetRtp: number;
@@ -203,11 +205,16 @@ export const DEFAULT_PAYLINES: PaylineConfig[] = [
 ];
 
 // Helper to determine board grid dimensions from layout id
-export function getBoardDimensions(boardType: '3x1' | '3x3' | '5x3' | '5x4'): { cols: number; rows: number } {
+export function getBoardDimensions(boardType: BoardType): { cols: number; rows: number } {
   switch (boardType) {
     case '3x1': return { cols: 3, rows: 1 };
     case '3x3': return { cols: 3, rows: 3 };
+    case '4x3': return { cols: 4, rows: 3 };
+    case '4x4': return { cols: 4, rows: 4 };
     case '5x4': return { cols: 5, rows: 4 };
+    case '6x3': return { cols: 6, rows: 3 };
+    case '6x4': return { cols: 6, rows: 4 };
+    case '7x7': return { cols: 7, rows: 7 };
     case '5x3':
     default:
       return { cols: 5, rows: 3 };
@@ -258,7 +265,7 @@ function getRandomSymbolWeighted(symbols: SlotSymbolConfig[]): SlotSymbolConfig 
  * Represented as grid[col][row].
  */
 export function generateBoardGrid(
-  boardType: '3x1' | '3x3' | '5x3' | '5x4',
+  boardType: BoardType,
   symbols: SlotSymbolConfig[]
 ): string[][] {
   const { cols, rows } = getBoardDimensions(boardType);
@@ -315,20 +322,41 @@ export interface LineWinResult {
 
 /**
  * Filters the paylines configured for the current grid dimensions, keeping only those that fit.
+ * If no configured paylines fit, dynamically generates straight row paylines.
  */
 export function getValidPaylinesForBoard(
-  boardType: '3x1' | '3x3' | '5x3' | '5x4',
+  boardType: BoardType,
   paylines: PaylineConfig[]
 ): PaylineConfig[] {
   const { cols, rows } = getBoardDimensions(boardType);
 
-  return paylines.filter(line => {
+  const filtered = paylines.filter(line => {
     if (!line.isActive) return false;
-    // Every coordinate in the payline must lie within the board boundary
     return line.coordinates.every(coord => {
       return coord.col >= 0 && coord.col < cols && coord.row >= 0 && coord.row < rows;
     });
   });
+
+  if (filtered.length > 0) {
+    return filtered;
+  }
+
+  // Fallback dynamic paylines generator for any board size (e.g. 4x3, 6x4, 7x7)
+  const dynamicLines: PaylineConfig[] = [];
+  for (let r = 0; r < rows; r++) {
+    const coords = [];
+    for (let c = 0; c < cols; c++) {
+      coords.push({ col: c, row: r });
+    }
+    dynamicLines.push({
+      id: `dynamic_line_row_${r}`,
+      name: `Linha Horizontal ${r + 1}`,
+      coordinates: coords,
+      isActive: true,
+    });
+  }
+
+  return dynamicLines;
 }
 
 /**
@@ -337,7 +365,7 @@ export function getValidPaylinesForBoard(
  */
 export function evaluateBoardWins(
   grid: string[][],
-  boardType: '3x1' | '3x3' | '5x3' | '5x4',
+  boardType: BoardType,
   symbols: SlotSymbolConfig[],
   paylines: PaylineConfig[],
   bet: number,

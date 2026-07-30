@@ -10,6 +10,8 @@ import {
 
 import { AdminConfig } from '../types';
 
+import { BoardType, SpinRollStyle } from '../types';
+
 interface SlotEngineEditorProps {
   engineConfig: SlotEngineConfig;
   onUpdateEngineConfig: (newConfig: SlotEngineConfig) => void;
@@ -26,7 +28,7 @@ export const SlotEngineEditor: React.FC<SlotEngineEditorProps> = ({
   const [editorTab, setEditorTab] = useState<'symbols' | 'paylines' | 'settings'>('symbols');
   const [symbols, setSymbols] = useState<SlotSymbolConfig[]>([]);
   const [paylines, setPaylines] = useState<PaylineConfig[]>([]);
-  const [boardType, setBoardType] = useState<'3x1' | '3x3' | '5x3' | '5x4'>('5x3');
+  const [boardType, setBoardType] = useState<BoardType>('5x3');
   const [targetRtp, setTargetRtp] = useState<number>(96.5);
 
   // Symbol form state
@@ -1201,8 +1203,13 @@ export const SlotEngineEditor: React.FC<SlotEngineEditorProps> = ({
                 >
                   <option value="3x1">3x1 (Retrô - 1 Linha x 3 Rolos)</option>
                   <option value="3x3">3x3 (Clássico - 3 Linhas x 3 Rolos)</option>
-                  <option value="5x3">5x3 (Padrão - 3 Linhas x 5 Rolos)</option>
+                  <option value="4x3">4x3 (Moderno - 3 Linhas x 4 Rolos)</option>
+                  <option value="4x4">4x4 (Quadrado - 4 Linhas x 4 Rolos)</option>
+                  <option value="5x3">5x3 (Padrão Slot - 3 Linhas x 5 Rolos)</option>
                   <option value="5x4">5x4 (Expandido - 4 Linhas x 5 Rolos)</option>
+                  <option value="6x3">6x3 (Largo - 3 Linhas x 6 Rolos)</option>
+                  <option value="6x4">6x4 (Megaways - 4 Linhas x 6 Rolos)</option>
+                  <option value="7x7">7x7 (Grid Cluster - 7 Linhas x 7 Rolos)</option>
                 </select>
                 <p className="text-[9px] text-gray-500">As paylines ativas que estiverem fora da grade serão omitidas automaticamente.</p>
               </div>
