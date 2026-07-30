@@ -322,6 +322,21 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
     }
   };
 
+  // Background Image File Upload
+  const handleFileUploadForBackground = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result && typeof event.target.result === 'string') {
+          const url = event.target.result;
+          onUpdateAdminConfig({ bgImage: url });
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // Add Custom Button
   const handleAddButton = () => {
     if (!btnLabel.trim() && !btnImageUrl.trim()) return;
@@ -441,29 +456,66 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
 
           <div className="h-4 w-[1px] bg-white/10 mx-1" />
 
-          <div className="flex items-center gap-1 text-xs text-gray-300">
-            <span className="text-[10px] uppercase font-bold text-gray-400">Tela:</span>
+          <div className="flex items-center gap-2 bg-black/60 p-1 rounded-xl border border-white/10 text-xs text-gray-300">
+            <span className="text-[10px] uppercase font-black text-amber-400 tracking-wider flex items-center gap-1 pl-1">
+              <Smartphone className="w-3.5 h-3.5" />
+              <span>Celular:</span>
+            </span>
+
+            {/* Decrease button */}
             <button
               type="button"
-              onClick={() => setPhoneWidth(290)}
-              className={`px-2 py-0.5 rounded text-[10px] font-bold ${phoneWidth === 290 ? 'bg-red-600 text-white' : 'bg-white/5 hover:bg-white/10'}`}
+              title="Diminuir Celular"
+              onClick={() => setPhoneWidth(prev => Math.max(240, prev - 20))}
+              className="p-1 bg-neutral-800 hover:bg-amber-500 hover:text-black rounded transition cursor-pointer active:scale-95"
             >
-              290px
+              <ZoomOut className="w-3.5 h-3.5" />
             </button>
+
+            {/* Slider */}
+            <input
+              type="range"
+              min={240}
+              max={650}
+              step={10}
+              value={phoneWidth}
+              onChange={(e) => setPhoneWidth(parseInt(e.target.value) || 360)}
+              className="w-20 accent-amber-500 cursor-pointer h-1 bg-neutral-700 rounded-lg appearance-none"
+              title="Ajustar largura do celular"
+            />
+
+            {/* Increase button */}
             <button
               type="button"
-              onClick={() => setPhoneWidth(360)}
-              className={`px-2 py-0.5 rounded text-[10px] font-bold ${phoneWidth === 360 ? 'bg-red-600 text-white' : 'bg-white/5 hover:bg-white/10'}`}
+              title="Aumentar Celular"
+              onClick={() => setPhoneWidth(prev => Math.min(650, prev + 20))}
+              className="p-1 bg-neutral-800 hover:bg-amber-500 hover:text-black rounded transition cursor-pointer active:scale-95"
             >
-              360px
+              <ZoomIn className="w-3.5 h-3.5" />
             </button>
-            <button
-              type="button"
-              onClick={() => setPhoneWidth(420)}
-              className={`px-2 py-0.5 rounded text-[10px] font-bold ${phoneWidth === 420 ? 'bg-red-600 text-white' : 'bg-white/5 hover:bg-white/10'}`}
-            >
-              420px
-            </button>
+
+            {/* Width Badge */}
+            <span className="text-[10px] font-mono font-black bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded border border-amber-500/30">
+              {phoneWidth}px
+            </span>
+
+            {/* Presets */}
+            <div className="flex items-center gap-0.5">
+              {[290, 360, 420, 480, 560, 640].map((w) => (
+                <button
+                  key={w}
+                  type="button"
+                  onClick={() => setPhoneWidth(w)}
+                  className={`px-1.5 py-0.5 rounded text-[9px] font-black transition cursor-pointer ${
+                    phoneWidth === w 
+                      ? 'bg-amber-400 text-black font-bold' 
+                      : 'bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white'
+                  }`}
+                >
+                  {w}px
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -1114,13 +1166,55 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                     <span>Mídia do Fundo (Imagem ou Vídeo MP4)</span>
                   </h3>
 
-                  <div>
-                    <label className="text-[10px] text-gray-300 font-bold block mb-1">URL da Imagem ou Vídeo (.mp4):</label>
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-gray-300 font-bold block">Escolha uma Imagem por Upload ou Link:</label>
+                    
+                    {/* Drag and Drop / Selector zone */}
+                    <div className="flex gap-2 items-center bg-black/60 p-2.5 rounded-xl border border-white/10 hover:border-amber-500/40 transition">
+                      <label className="flex-1 flex flex-col items-center justify-center border border-dashed border-white/20 hover:border-amber-400 hover:bg-white/5 py-4 px-2 rounded-lg cursor-pointer transition text-center group">
+                        <Upload className="w-5 h-5 text-gray-400 group-hover:text-amber-400 group-hover:scale-110 transition mb-1" />
+                        <span className="text-[10px] text-gray-300 font-extrabold uppercase tracking-wide group-hover:text-white">Fazer Upload de Imagem</span>
+                        <span className="text-[8px] text-gray-500 mt-0.5 font-bold">Arraste ou clique para selecionar</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileUploadForBackground}
+                          className="hidden"
+                        />
+                      </label>
+
+                      {/* Preview thumbnail of current background */}
+                      {adminConfig.bgImage && (
+                        <div className="relative w-16 h-16 rounded-lg border border-white/15 bg-neutral-900 overflow-hidden shrink-0 group flex items-center justify-center shadow-inner">
+                          {adminConfig.bgImage.endsWith('.mp4') || adminConfig.bgImage.includes('video/') || adminConfig.bgImage.startsWith('data:video/') ? (
+                            <div className="text-[8px] text-amber-300 font-bold font-mono">Vídeo MP4</div>
+                          ) : (
+                            <img 
+                              src={adminConfig.bgImage} 
+                              alt="Fundo" 
+                              className="w-full h-full object-cover" 
+                              referrerPolicy="no-referrer"
+                            />
+                          )}
+                          <button
+                            type="button"
+                            title="Remover Imagem de Fundo"
+                            onClick={() => onUpdateAdminConfig({ bgImage: '' })}
+                            className="absolute inset-0 bg-red-600/95 text-white font-black text-[9px] uppercase tracking-wider opacity-0 group-hover:opacity-100 transition flex items-center justify-center cursor-pointer"
+                          >
+                            Remover
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="text-center text-[9px] font-black uppercase text-amber-500/60 my-1">— OU INSIRA UM LINK DIRETO —</div>
+
                     <input
                       type="text"
                       value={adminConfig.bgImage}
                       onChange={(e) => onUpdateAdminConfig({ bgImage: e.target.value })}
-                      placeholder="https://exemplo.com/fundo.png"
+                      placeholder="https://exemplo.com/fundo.png ou link .mp4"
                       className="w-full px-3 py-1.5 bg-black/80 border border-white/20 rounded-lg text-xs text-yellow-300 focus:outline-none focus:border-red-500 font-mono"
                     />
                   </div>

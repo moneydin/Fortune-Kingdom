@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Menu, ShieldAlert, Volume2, VolumeX, Plus, Minus, Trophy, Coins, Play, Square, Settings2, Zap, Smartphone, Monitor, Tablet, ZoomIn, ZoomOut, Sparkles } from 'lucide-react';
+import { Menu, ShieldAlert, Volume2, VolumeX, Plus, Minus, Trophy, Coins, Play, Square, Settings2, Zap, Smartphone, Monitor, Tablet, ZoomIn, ZoomOut, Sparkles, X } from 'lucide-react';
 import { SlotMachine } from './components/SlotMachine';
 import { SpinButton } from './components/SpinButton';
 import { GameMenuModal } from './components/GameMenuModal';
@@ -132,6 +132,7 @@ export default function App() {
   const [adminConfig, setAdminConfig] = useState<AdminConfig>(() => loadAdminConfig());
   const [pcViewportMode, setPcViewportMode] = useState<'mobile' | 'pc' | 'tablet'>('mobile');
   const [pcZoomScale, setPcZoomScale] = useState<number>(100);
+  const [winBannerDismissed, setWinBannerDismissed] = useState<boolean>(false);
 
   const [gameState, setGameState] = useState<GameState>(() => {
     const initialConfig = loadAdminConfig();
@@ -315,6 +316,7 @@ export default function App() {
     setActiveWinLineIndex(null);
     setReelsStopTrigger(true);
     setHasAnticipation(false);
+    setWinBannerDismissed(false);
     
     setGameState(prev => {
       const nextRemaining = isBonusSpin ? (prev.bonusSpinsRemaining ?? 1) - 1 : 0;
@@ -1088,9 +1090,19 @@ export default function App() {
         )}
 
         {/* Sequential Win & Total Win Celebration Banner Overlay */}
-        {(adminConfig.showWinBanner !== false) && gameState.win > 0 && !gameState.isSpinning && (
+        {(adminConfig.showWinBanner !== false) && gameState.win > 0 && !gameState.isSpinning && !winBannerDismissed && (
           <div className="absolute top-[18%] left-1/2 -translate-x-1/2 z-40 max-w-[90%] w-[320px] sm:w-[380px] bg-gradient-to-r from-[#2b1800]/95 via-black/95 to-[#2b1800]/95 border-2 border-yellow-400 p-2.5 sm:p-3 rounded-2xl text-center shadow-[0_0_40px_rgba(251,191,36,0.8)] animate-in zoom-in duration-300 pointer-events-none flex flex-col items-center">
-            <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-black text-yellow-300 uppercase tracking-widest">
+            {/* Close Button (X) */}
+            <button
+              type="button"
+              onClick={() => setWinBannerDismissed(true)}
+              className="absolute top-2 right-2 p-1.5 bg-black/80 hover:bg-red-600 border border-yellow-500/40 text-yellow-400 hover:text-white rounded-full transition pointer-events-auto active:scale-90 cursor-pointer shadow-md z-50"
+              title="Fechar painel de ganho"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+
+            <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-black text-yellow-300 uppercase tracking-widest mt-1">
               <Sparkles className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400 animate-spin" />
               <span>GANHO NA RODADA</span>
               <Sparkles className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400 animate-spin" />
