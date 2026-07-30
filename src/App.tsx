@@ -8,7 +8,7 @@ import { CriadorDesignerModal } from './components/CriadorDesignerModal';
 import { BackgroundMedia } from './components/BackgroundMedia';
 import { CounterUpAnimation } from './components/CounterUpAnimation';
 import { motion } from 'motion/react';
-import { GameState, SymbolType, AdminConfig, GameSettings, SpinHistoryItem, CustomButtonConfig } from './types';
+import { GameState, SymbolType, AdminConfig, GameSettings, SpinHistoryItem, CustomButtonConfig, getCustomButtonStyles } from './types';
 import { 
   SlotEngineConfig, 
   loadEngineConfig, 
@@ -991,18 +991,21 @@ export default function App() {
             : 'max-w-[min(100vw,calc(100vh*9/16))] max-h-[min(100dvh,calc(100vw*16/9))] sm:max-h-[840px] aspect-[9/16] sm:rounded-[36px] sm:border-[10px] sm:border-neutral-800 shadow-[0_20px_60px_rgba(0,0,0,0.9)]'
         }`}
       >
-        {/* Background Media Layer (Image or Infinite Loop Video) */}
-        <BackgroundMedia 
-          src={adminConfig.bgImage}
-          posX={adminConfig.bgPosX}
-          posY={adminConfig.bgPosY}
-          zoom={adminConfig.bgZoom}
-          mediaType={adminConfig.bgMediaType}
-        />
+        {/* Fullscreen blurred ambient background to fill wide screens elegantly */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-30 select-none z-0">
+          <BackgroundMedia 
+            src={adminConfig.bgImage}
+            posX={adminConfig.bgPosX}
+            posY={adminConfig.bgPosY}
+            zoom={adminConfig.bgZoom}
+            mediaType={adminConfig.bgMediaType}
+            className="blur-xl scale-110"
+          />
+        </div>
 
         {/* Game Play Area with RIGID aspect ratio matching the designer preview */}
         <div
-          className="relative w-full h-full flex flex-col justify-between items-center select-none"
+          className="relative w-full h-full flex flex-col justify-between items-center select-none overflow-hidden z-10"
           style={{
             aspectRatio: '9/16',
             width: '100%',
@@ -1011,6 +1014,14 @@ export default function App() {
             maxHeight: 'calc(100vw * 16 / 9)',
           }}
         >
+          {/* Main Background Media (Sharp and perfectly aligned in 9:16 aspect ratio) */}
+          <BackgroundMedia 
+            src={adminConfig.bgImage}
+            posX={adminConfig.bgPosX}
+            posY={adminConfig.bgPosY}
+            zoom={adminConfig.bgZoom}
+            mediaType={adminConfig.bgMediaType}
+          />
 
           {/* TOP INTERFACE BAR */}
         {(adminConfig.showHeader !== false) && (
@@ -1213,9 +1224,12 @@ export default function App() {
               left: `${btn.posX}%`,
               transform: `translate(-50%, -50%) scale(${btn.scale / 100})`,
             }}
-            className={`z-20 px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-black uppercase tracking-wider transition pointer-events-auto cursor-pointer shadow-md select-none ${btn.bgColor} ${btn.textColor}`}
+            className={`z-20 whitespace-nowrap ${getCustomButtonStyles(btn)}`}
           >
-            {btn.label}
+            {btn.imageUrl && (
+              <img src={btn.imageUrl} alt={btn.label} className="w-3.5 h-3.5 object-contain rounded mr-1 pointer-events-none" referrerPolicy="no-referrer" />
+            )}
+            <span>{btn.label}</span>
           </button>
         ))}
 

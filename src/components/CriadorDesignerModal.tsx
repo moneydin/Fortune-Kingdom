@@ -7,7 +7,7 @@ import {
   Lock, Unlock, Key, RefreshCw, Award, Upload, Check, LayoutGrid, Dices,
   GripHorizontal, ArrowUp, ArrowDown, ArrowLeft, ArrowRight
 } from 'lucide-react';
-import { AdminConfig, CustomButtonConfig, CustomTextConfig, GameState, SymbolType, SymbolImageConfig, BoardType, SpinRollStyle } from '../types';
+import { AdminConfig, CustomButtonConfig, CustomTextConfig, GameState, SymbolType, SymbolImageConfig, BoardType, SpinRollStyle, getCustomButtonStyles } from '../types';
 import { SlotMachine } from './SlotMachine';
 import { BackgroundMedia } from './BackgroundMedia';
 import { SpinButton } from './SpinButton';
@@ -61,6 +61,18 @@ const SPIN_ROLL_STYLES: { id: SpinRollStyle; label: string; desc: string; icon: 
   { id: 'hyper_blur', label: 'Super Blur Neon', desc: 'Borrão de movimento em alta velocidade com travamento seco', icon: '🌀' },
   { id: 'scale_pop', label: 'Zoom & Pop 3D', desc: 'Animação de escala 3D surgindo em destaque no resultado', icon: '✨' },
   { id: 'wave_swing', label: 'Onda Harmônica', desc: 'Balanço senoidal em fase horizontal e vertical durante a rolagem', icon: '🌊' },
+];
+
+const BUTTON_COLOR_PRESETS = [
+  { name: 'Ouro', bgColor: 'bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600', textColor: 'text-black font-black' },
+  { name: 'Vermelho', bgColor: 'bg-gradient-to-r from-red-600 to-rose-500', textColor: 'text-white font-black' },
+  { name: 'Verde', bgColor: 'bg-gradient-to-r from-emerald-600 to-teal-500', textColor: 'text-white font-black' },
+  { name: 'Azul', bgColor: 'bg-gradient-to-r from-blue-600 to-indigo-500', textColor: 'text-white font-black' },
+  { name: 'Roxo', bgColor: 'bg-gradient-to-r from-purple-600 to-pink-500', textColor: 'text-white font-black' },
+  { name: 'Preto', bgColor: 'bg-neutral-900 border border-yellow-500/50', textColor: 'text-yellow-400 font-extrabold' },
+  { name: 'Prata', bgColor: 'bg-gradient-to-r from-gray-200 via-white to-gray-300', textColor: 'text-gray-900 font-black' },
+  { name: 'Vulcan', bgColor: 'bg-gradient-to-r from-amber-600 to-red-600', textColor: 'text-white font-black' },
+  { name: 'Cyan', bgColor: 'bg-gradient-to-r from-cyan-500 to-blue-500', textColor: 'text-black font-black' },
 ];
 
 export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
@@ -271,6 +283,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
   const [btnAction, setBtnAction] = useState<CustomButtonConfig['actionType']>('buy_bonus');
   const [btnValue, setBtnValue] = useState<string>('100');
   const [btnColor, setBtnColor] = useState<string>('bg-gradient-to-r from-amber-500 to-yellow-400');
+  const [btnTextColor, setBtnTextColor] = useState<string>('text-black font-black');
   const [btnShape, setBtnShape] = useState<CustomButtonConfig['shape']>('pill');
   const [btnIcon, setBtnIcon] = useState<CustomButtonConfig['icon']>('play');
   const [btnImageUrl, setBtnImageUrl] = useState<string>('');
@@ -542,7 +555,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
       posY: 88,
       scale: 100,
       bgColor: btnColor,
-      textColor: 'text-black font-black',
+      textColor: btnTextColor,
       shape: btnShape,
       icon: btnIcon,
       imageUrl: btnImageUrl.trim() || undefined,
@@ -1855,7 +1868,34 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                         <option value="circle">Círculo Perfeito</option>
                         <option value="square">Quadrado</option>
                         <option value="rounded">Retângulo Arredondado</option>
+                        <option value="neon_glow">Neon Brilhante (Glow)</option>
+                        <option value="glass">Vidro Translúcido (Glass)</option>
+                        <option value="retro">Retro Arcade (8-bit)</option>
                       </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-gray-300 font-bold block mb-1.5">Cor e Estilo do Botão:</label>
+                      <div className="grid grid-cols-3 gap-1.5 max-h-[140px] overflow-y-auto pr-1">
+                        {BUTTON_COLOR_PRESETS.map((preset) => {
+                          const isActive = btnColor === preset.bgColor;
+                          return (
+                            <button
+                              key={preset.name}
+                              type="button"
+                              onClick={() => {
+                                setBtnColor(preset.bgColor);
+                                setBtnTextColor(preset.textColor);
+                              }}
+                              className={`p-1.5 text-[9px] font-black uppercase text-center rounded transition-all duration-150 border cursor-pointer ${preset.bgColor} ${preset.textColor} ${
+                                isActive ? 'border-yellow-400 ring-2 ring-yellow-400/55 scale-[1.03]' : 'border-neutral-800 opacity-80 hover:opacity-100 hover:scale-[1.02]'
+                              }`}
+                            >
+                              {preset.name}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <div>
@@ -2521,34 +2561,127 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
 
                     {/* If selected target is custom button */}
                     {nudgeTarget?.startsWith('button-') && (
-                      <div>
-                        <div className="flex justify-between text-[9px] text-gray-300 font-bold">
-                          <span>Escala do Botão (%):</span>
-                          {(() => {
-                            const btnId = nudgeTarget.replace('button-', '');
-                            const btn = (adminConfig.customButtons || []).find(b => b.id === btnId);
-                            return (
-                              <>
-                                <span className="text-yellow-400 font-mono">{btn ? btn.scale : 100}%</span>
+                      <div className="space-y-3 pt-1 border-t border-white/5">
+                        {(() => {
+                          const btnId = nudgeTarget.replace('button-', '');
+                          const btn = (adminConfig.customButtons || []).find(b => b.id === btnId);
+                          if (!btn) return <div className="text-[10px] text-red-400">Botão não encontrado</div>;
+
+                          const updateBtnProperty = (updates: Partial<CustomButtonConfig>) => {
+                            const updated = (adminConfig.customButtons || []).map(b =>
+                              b.id === btnId ? { ...b, ...updates } : b
+                            );
+                            onUpdateAdminConfig({ customButtons: updated });
+                          };
+
+                          return (
+                            <div className="space-y-2.5">
+                              {/* Title / Label input */}
+                              <div>
+                                <label className="text-[9px] text-gray-300 font-bold block mb-1">Texto do Botão:</label>
+                                <input
+                                  type="text"
+                                  value={btn.label}
+                                  onChange={(e) => updateBtnProperty({ label: e.target.value })}
+                                  className="w-full px-2 py-1 bg-black/80 border border-white/15 rounded text-[11px] text-white focus:outline-none focus:border-yellow-500"
+                                />
+                              </div>
+
+                              {/* Scale slider */}
+                              <div>
+                                <div className="flex justify-between text-[9px] text-gray-300 font-bold mb-1">
+                                  <span>Escala (%):</span>
+                                  <span className="text-yellow-400 font-mono">{btn.scale}%</span>
+                                </div>
                                 <input
                                   type="range"
                                   min="50"
                                   max="180"
                                   step="5"
-                                  value={btn ? btn.scale : 100}
-                                  onChange={(e) => {
-                                    const nextScale = parseInt(e.target.value);
-                                    const updated = (adminConfig.customButtons || []).map(b =>
-                                      b.id === btnId ? { ...b, scale: nextScale } : b
-                                    );
-                                    onUpdateAdminConfig({ customButtons: updated });
-                                  }}
+                                  value={btn.scale}
+                                  onChange={(e) => updateBtnProperty({ scale: parseInt(e.target.value) })}
                                   className="w-full accent-yellow-400 h-1 cursor-pointer"
                                 />
-                              </>
-                            );
-                          })()}
-                        </div>
+                              </div>
+
+                              {/* Shape dropdown */}
+                              <div>
+                                <label className="text-[9px] text-gray-300 font-bold block mb-1">Forma do Botão:</label>
+                                <select
+                                  value={btn.shape || 'pill'}
+                                  onChange={(e) => updateBtnProperty({ shape: e.target.value as any })}
+                                  className="w-full px-2 py-1 bg-black border border-white/15 rounded text-[10px] text-amber-300 focus:outline-none"
+                                >
+                                  <option value="pill">Pílula Arredondada (Pill)</option>
+                                  <option value="circle">Círculo Perfeito</option>
+                                  <option value="square">Quadrado</option>
+                                  <option value="rounded">Retângulo Arredondado</option>
+                                  <option value="neon_glow">Neon Brilhante (Glow)</option>
+                                  <option value="glass">Vidro Translúcido (Glass)</option>
+                                  <option value="retro">Retro Arcade (8-bit)</option>
+                                </select>
+                              </div>
+
+                              {/* Color Presets */}
+                              <div>
+                                <label className="text-[9px] text-gray-300 font-bold block mb-1">Cor do Botão:</label>
+                                <div className="grid grid-cols-5 gap-1">
+                                  {BUTTON_COLOR_PRESETS.map((preset) => {
+                                    const isSelected = btn.bgColor === preset.bgColor;
+                                    return (
+                                      <button
+                                        key={preset.name}
+                                        type="button"
+                                        onClick={() => updateBtnProperty({ bgColor: preset.bgColor, textColor: preset.textColor })}
+                                        title={preset.name}
+                                        className={`w-full h-5 rounded cursor-pointer border transition-all duration-150 flex items-center justify-center ${preset.bgColor} ${
+                                          isSelected ? 'border-yellow-400 ring-1 ring-yellow-400 scale-[1.05]' : 'border-neutral-800 opacity-85 hover:opacity-100'
+                                        }`}
+                                      >
+                                        <span className={`text-[8px] font-black ${preset.textColor}`}>A</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              {/* Action Type */}
+                              <div>
+                                <label className="text-[9px] text-gray-300 font-bold block mb-1">Função / Ação:</label>
+                                <select
+                                  value={btn.actionType}
+                                  onChange={(e) => updateBtnProperty({ actionType: e.target.value as any })}
+                                  className="w-full px-2 py-1 bg-black border border-white/15 rounded text-[10px] text-white focus:outline-none"
+                                >
+                                  <option value="spin">GIRAR (Spin)</option>
+                                  <option value="buy_bonus">Comprar Bônus</option>
+                                  <option value="bet_plus">Aumentar Aposta (+)</option>
+                                  <option value="bet_minus">Diminuir Aposta (-)</option>
+                                  <option value="turbo_toggle">Modo Turbo</option>
+                                  <option value="auto_spin">Auto Giro</option>
+                                  <option value="open_menu">Abrir Menu</option>
+                                  <option value="add_balance">Adicionar R$ Saldo</option>
+                                  <option value="force_big_win">Forçar Mega Vitória</option>
+                                  <option value="redirect_url">Redirecionar Link</option>
+                                </select>
+                              </div>
+
+                              {/* Action Value */}
+                              {(btn.actionType === 'redirect_url' || btn.actionType === 'add_balance') && (
+                                <div>
+                                  <label className="text-[9px] text-gray-300 font-bold block mb-1">Valor / Link:</label>
+                                  <input
+                                    type="text"
+                                    value={btn.actionValue}
+                                    onChange={(e) => updateBtnProperty({ actionValue: e.target.value })}
+                                    placeholder="Ex: https://... ou 1000"
+                                    className="w-full px-2 py-1 bg-black/80 border border-white/15 rounded text-[10px] text-white focus:outline-none font-mono"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
 
@@ -2891,7 +3024,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                     left: `${btn.posX}%`,
                     transform: `translate(-50%, -50%) scale(${btn.scale / 100})`,
                   }}
-                  className={`z-30 cursor-move px-3 py-1.5 rounded-full text-xs font-black text-black shadow-lg border border-amber-300 flex items-center gap-1.5 ${btn.bgColor}`}
+                  className={`z-30 cursor-move whitespace-nowrap select-none ${getCustomButtonStyles(btn)}`}
                 >
                   {btn.imageUrl && (
                     <img src={btn.imageUrl} alt={btn.label} className="w-4 h-4 object-contain rounded" />

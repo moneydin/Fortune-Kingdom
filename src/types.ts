@@ -193,3 +193,56 @@ export interface GameState {
   bonusMultiplierAccumulated?: number;
 }
 
+export function getCustomButtonStyles(btn: {
+  shape?: string;
+  bgColor?: string;
+  textColor?: string;
+}): string {
+  let shapeClass = 'rounded-full';
+  let colorClass = btn.bgColor || 'bg-gradient-to-r from-amber-500 to-yellow-400';
+  let textClass = btn.textColor || 'text-black font-black';
+  let borderClass = 'border border-amber-400/30';
+
+  switch (btn.shape) {
+    case 'circle':
+      shapeClass = 'rounded-full aspect-square flex items-center justify-center p-0 w-11 h-11 text-[9px] sm:text-xs';
+      break;
+    case 'square':
+      shapeClass = 'rounded-none px-3 py-1.5 text-[9px] sm:text-xs';
+      break;
+    case 'rounded':
+      shapeClass = 'rounded-xl px-3.5 py-1.5 text-[9px] sm:text-xs';
+      break;
+    case 'neon_glow':
+      shapeClass = 'rounded-lg px-3.5 py-1.5 border-2 border-yellow-400 text-yellow-400 shadow-[0_0_12px_rgba(234,179,8,0.7)] text-[9px] sm:text-xs';
+      if (!btn.bgColor || btn.bgColor.includes('gradient')) {
+        colorClass = 'bg-black/90';
+      }
+      textClass = 'text-yellow-400 font-extrabold';
+      borderClass = '';
+      break;
+    case 'glass':
+      shapeClass = 'rounded-xl px-3.5 py-1.5 bg-white/20 backdrop-blur-md border border-white/35 text-white shadow-lg text-[9px] sm:text-xs';
+      if (!btn.bgColor || btn.bgColor.includes('gradient')) {
+        colorClass = 'bg-white/15';
+      }
+      textClass = 'text-white font-bold';
+      borderClass = '';
+      break;
+    case 'retro':
+      shapeClass = 'rounded-none px-3.5 py-1.5 border-t-2 border-l-2 border-r-4 border-b-4 border-black font-mono uppercase tracking-tighter text-[9px] sm:text-xs';
+      if (!btn.bgColor || btn.bgColor.includes('gradient')) {
+        colorClass = 'bg-yellow-400';
+      }
+      textClass = 'text-black font-black';
+      borderClass = '';
+      break;
+    case 'pill':
+    default:
+      shapeClass = 'rounded-full px-3.5 py-1.5 text-[9px] sm:text-xs';
+      break;
+  }
+
+  return `flex items-center justify-center gap-1 shadow-md hover:scale-105 active:scale-95 transition-all duration-150 uppercase tracking-wider ${shapeClass} ${colorClass} ${textClass} ${borderClass}`;
+}
+
