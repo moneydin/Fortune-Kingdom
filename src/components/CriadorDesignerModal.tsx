@@ -103,6 +103,56 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
   const [draggingTarget, setDraggingTarget] = useState<string | null>(null);
   const dragStartRef = useRef<{ x: number; y: number; initialX: number; initialY: number }>({ x: 0, y: 0, initialX: 0, initialY: 0 });
 
+  const [resizingTarget, setResizingTarget] = useState<string | null>(null);
+  const [resizeHandle, setResizeHandle] = useState<'tl' | 'tr' | 'bl' | 'br' | null>(null);
+  const resizeStartRef = useRef<{ x: number; y: number; startWidth: number; startHeight: number; startScale: number; startFontSize: number }>({
+    x: 0,
+    y: 0,
+    startWidth: 0,
+    startHeight: 0,
+    startScale: 100,
+    startFontSize: 14,
+  });
+
+  const handleStartResize = (target: string, handle: 'tl' | 'tr' | 'bl' | 'br', e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setResizingTarget(target);
+    setResizeHandle(handle);
+    setNudgeTarget(target as any);
+
+    let startWidth = 0;
+    let startHeight = 0;
+    let startScale = 100;
+    let startFontSize = 14;
+
+    if (target === 'phone') {
+      startWidth = phoneWidth;
+    } else if (target === 'slot') {
+      startWidth = adminConfig.slotWidth ?? 92;
+      startHeight = adminConfig.slotHeight ?? 38;
+    } else if (target === 'spin') {
+      startScale = adminConfig.spinScale ?? 100;
+    } else if (target.startsWith('button-')) {
+      const btnId = target.replace('button-', '');
+      const btn = (adminConfig.customButtons || []).find(b => b.id === btnId);
+      if (btn) startScale = btn.scale;
+    } else if (target.startsWith('text-')) {
+      const textId = target.replace('text-', '');
+      const txt = (adminConfig.customTexts || []).find(t => t.id === textId);
+      if (txt) startFontSize = txt.fontSize;
+    }
+
+    resizeStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      startWidth,
+      startHeight,
+      startScale,
+      startFontSize,
+    };
+  };
+
   // Pixel Precision Nudge State
   const [nudgeTarget, setNudgeTarget] = useState<'phone' | 'toolbar' | 'slot' | 'spin'>('phone');
   const [nudgeStep, setNudgeStep] = useState<number>(1); // 1px, 5px, 10px
@@ -223,6 +273,54 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
+    if (resizingTarget && resizeHandle && previewCanvasRef.current) {
+      const rect = previewCanvasRef.current.getBoundingClientRect();
+      const deltaX = e.clientX - resizeStartRef.current.x;
+      const deltaY = e.clientY - resizeStartRef.current.y;
+
+      if (resizingTarget === 'phone') {
+        const factor = (resizeHandle === 'tr' || resizeHandle === 'br') ? 1 : -1;
+        const newPhoneWidth = Math.max(240, Math.min(700, Math.round(resizeStartRef.current.startWidth + deltaX * factor * 1.5)));
+        setPhoneWidth(newPhoneWidth);
+      } else if (resizingTarget === 'slot') {
+        const factorX = (resizeHandle === 'tr' || resizeHandle === 'br') ? 1 : -1;
+        const factorY = (resizeHandle === 'bl' || resizeHandle === 'br') ? 1 : -1;
+        
+        // Approximate scaling delta relative to phone viewport size inside container
+        const deltaXPct = (deltaX / rect.width) * 100 * 2.2;
+        const deltaYPct = (deltaY / rect.height) * 100 * 2.2;
+        
+        const newSlotWidth = Math.max(10, Math.min(100, roundPrecision(resizeStartRef.current.startWidth + deltaXPct * factorX)));
+        const newSlotHeight = Math.max(10, Math.min(100, roundPrecision(resizeStartRef.current.startHeight + deltaYPct * factorY)));
+        
+        onUpdateAdminConfig({
+          slotWidth: newSlotWidth,
+          slotHeight: newSlotHeight
+        });
+      } else if (resizingTarget === 'spin') {
+        const factorX = (resizeHandle === 'tr' || resizeHandle === 'br') ? 1 : -1;
+        const newSpinScale = Math.max(40, Math.min(250, Math.round(resizeStartRef.current.startScale + deltaX * factorX * 0.8)));
+        onUpdateAdminConfig({ spinScale: newSpinScale });
+      } else if (resizingTarget.startsWith('button-')) {
+        const btnId = resizingTarget.replace('button-', '');
+        const factorX = (resizeHandle === 'tr' || resizeHandle === 'br') ? 1 : -1;
+        const newScale = Math.max(40, Math.min(250, Math.round(resizeStartRef.current.startScale + deltaX * factorX * 0.8)));
+        const updatedButtons = (adminConfig.customButtons || []).map(b => 
+          b.id === btnId ? { ...b, scale: newScale } : b
+        );
+        onUpdateAdminConfig({ customButtons: updatedButtons });
+      } else if (resizingTarget.startsWith('text-')) {
+        const textId = resizingTarget.replace('text-', '');
+        const factorX = (resizeHandle === 'tr' || resizeHandle === 'br') ? 1 : -1;
+        const newFontSize = Math.max(8, Math.min(64, Math.round(resizeStartRef.current.startFontSize + deltaX * factorX * 0.2)));
+        const updatedTexts = (adminConfig.customTexts || []).map(t => 
+          t.id === textId ? { ...t, fontSize: newFontSize } : t
+        );
+        onUpdateAdminConfig({ customTexts: updatedTexts });
+      }
+      return;
+    }
+
     if (!draggingTarget || !previewCanvasRef.current) return;
     const rect = previewCanvasRef.current.getBoundingClientRect();
     const deltaX = ((e.clientX - dragStartRef.current.x) / rect.width) * 100;
@@ -291,6 +389,8 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
 
   const handleMouseUp = () => {
     setDraggingTarget(null);
+    setResizingTarget(null);
+    setResizeHandle(null);
   };
 
   // Symbol Image File Upload: Default to CONTAIN (Full image, no cropping)
@@ -1846,158 +1946,312 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
             </div>
           </div>
 
-          {/* Phone Simulator Frame (Draggable) */}
-          <div 
+          {/* Phone Wrapper with Resize Bounding Box */}
+          <div
             style={{ 
               width: `${phoneWidth}px`,
               transform: `translate(${adminConfig.phonePosX ?? 0}px, ${adminConfig.phonePosY ?? 0}px)`
             }}
-            className="relative aspect-[9/16] bg-black rounded-[38px] border-[8px] border-neutral-800 overflow-hidden shadow-[0_0_60px_rgba(239,68,68,0.3)] flex flex-col justify-between z-20 transition-transform duration-75 select-none"
+            className={`relative aspect-[9/16] z-20 transition-transform duration-75 select-none ${
+              nudgeTarget === 'phone' ? 'ring-2 ring-yellow-400 ring-offset-4 ring-offset-black rounded-[38px]' : ''
+            }`}
+            onClick={() => setNudgeTarget('phone')}
           >
-            {/* Draggable Top Handle Bar over Notch */}
-            <div 
-              onMouseDown={(e) => handleStartDrag('phone', adminConfig.phonePosX ?? 0, adminConfig.phonePosY ?? 0, e.clientX, e.clientY)}
-              className="w-full bg-gradient-to-r from-neutral-900 via-neutral-800 to-neutral-900 border-b border-amber-500/40 px-3 py-1 flex items-center justify-between cursor-grab active:cursor-grabbing hover:bg-neutral-800 z-50 transition"
-            >
-              <div className="flex items-center gap-1.5">
-                <Move className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-                <span className="text-[10px] font-black uppercase tracking-wider text-amber-300">
-                  Mover Celular (X:{adminConfig.phonePosX ?? 0}px Y:{adminConfig.phonePosY ?? 0}px)
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                {(adminConfig.phonePosX !== 0 || adminConfig.phonePosY !== 0) && (
-                  <button
-                    type="button"
-                    title="Centralizar Celular"
-                    onClick={(e) => { e.stopPropagation(); onUpdateAdminConfig({ phonePosX: 0, phonePosY: 0 }); }}
-                    className="p-1 bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-black rounded transition cursor-pointer"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Background Media */}
-            <BackgroundMedia 
-              src={adminConfig.bgImage}
-              posX={adminConfig.bgPosX}
-              posY={adminConfig.bgPosY}
-              zoom={adminConfig.bgZoom}
-              mediaType={adminConfig.bgMediaType}
-            />
-
-            {/* Draggable Slot Frame */}
-            <div
-              onMouseDown={(e) => handleStartDrag('slot', adminConfig.slotLeft ?? 4, adminConfig.slotTop ?? 28, e.clientX, e.clientY)}
-              style={{
-                top: `${adminConfig.slotTop ?? 28}%`,
-                left: `${adminConfig.slotLeft ?? 4}%`,
-                width: `${adminConfig.slotWidth ?? 92}%`,
-                height: `${adminConfig.slotHeight ?? 38}%`,
-                borderColor: adminConfig.slotHideOuterFrame ? 'transparent' : '#ffb700',
-                borderWidth: adminConfig.slotHideOuterFrame ? '0px' : '4px',
-                backgroundColor: adminConfig.slotHideOuterFrame ? 'transparent' : 'rgba(0,0,0,0.65)',
-                boxShadow: adminConfig.slotHideOuterFrame ? 'none' : '0 10px 35px rgba(0,0,0,0.8)',
-              }}
-              className="absolute cursor-move z-20 flex items-center justify-center rounded-2xl transition-all p-1 overflow-hidden border-solid"
-            >
-              <div className="w-full h-full pointer-events-none">
-                <SlotMachine 
-                  isSpinning={gameState.isSpinning} 
-                  grid={previewGrid} 
-                  customSymbols={adminConfig.customSymbols}
-                  customSymbolConfigs={adminConfig.customSymbolConfigs}
-                  slotHideGrid={adminConfig.slotHideGrid}
-                  cashAnticipationColor={adminConfig.cashAnticipationColor ?? 'gold'}
-                  spinRollStyle={adminConfig.spinRollStyle ?? 'standard'}
+            {/* Visual Bounding Box with 4 Handles around Phone */}
+            {nudgeTarget === 'phone' && (
+              <div className="absolute -inset-4 border-2 border-dashed border-yellow-400 pointer-events-none rounded-[44px] z-50">
+                <div 
+                  onMouseDown={(e) => handleStartResize('phone', 'tl', e)}
+                  className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                  title="Arrastar para Redimensionar"
                 />
-              </div>
-            </div>
-
-            {/* Floating Buy Bonus Option */}
-            {adminConfig.enableBuyBonus !== false && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '71%',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                }}
-                className="z-20 px-3.5 py-1 bg-gradient-to-r from-yellow-500 via-amber-500 to-yellow-600 text-black font-black text-[10px] rounded-full shadow-[0_4px_15px_rgba(245,158,11,0.4)] border border-yellow-300 uppercase tracking-wider flex items-center gap-1 pointer-events-none select-none"
-              >
-                <span>⭐ Comprar Bônus (x{adminConfig.buyBonusMultiplier ?? 50})</span>
+                <div 
+                  onMouseDown={(e) => handleStartResize('phone', 'tr', e)}
+                  className="absolute -top-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                  title="Arrastar para Redimensionar"
+                />
+                <div 
+                  onMouseDown={(e) => handleStartResize('phone', 'bl', e)}
+                  className="absolute -bottom-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                  title="Arrastar para Redimensionar"
+                />
+                <div 
+                  onMouseDown={(e) => handleStartResize('phone', 'br', e)}
+                  className="absolute -bottom-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                  title="Arrastar para Redimensionar"
+                />
               </div>
             )}
 
-            {/* Draggable Spin Button Cluster */}
-            <div
-              onMouseDown={(e) => handleStartDrag('spin', adminConfig.spinLeft ?? 50, 100 - (adminConfig.spinBottom ?? 4), e.clientX, e.clientY)}
-              style={{
-                bottom: `${adminConfig.spinBottom ?? 4}%`,
-                left: `${adminConfig.spinLeft ?? 50}%`,
-                transform: `translateX(-50%) scale(${(adminConfig.spinScale ?? 100) / 100})`,
-              }}
-              className="absolute z-30 cursor-move flex items-center justify-center gap-2 transition-all duration-100 select-none"
+            {/* Phone Simulator Frame */}
+            <div 
+              className="w-full h-full relative bg-black rounded-[38px] border-[8px] border-neutral-800 overflow-hidden shadow-[0_0_60px_rgba(239,68,68,0.3)] flex flex-col justify-between select-none"
             >
-              <div className="w-9 h-9 rounded-full border border-white/10 bg-black/60 text-gray-400 flex flex-col items-center justify-center shadow-md">
-                <Zap className="w-3.5 h-3.5 text-amber-400" />
-                <span className="text-[7px] font-black uppercase leading-none mt-0.5">Turbo</span>
+              {/* Draggable Top Handle Bar over Notch */}
+              <div 
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  handleStartDrag('phone', adminConfig.phonePosX ?? 0, adminConfig.phonePosY ?? 0, e.clientX, e.clientY);
+                  setNudgeTarget('phone');
+                }}
+                className="w-full bg-gradient-to-r from-neutral-900 via-neutral-800 to-neutral-900 border-b border-amber-500/40 px-3 py-1 flex items-center justify-between cursor-grab active:cursor-grabbing hover:bg-neutral-800 z-50 transition"
+              >
+                <div className="flex items-center gap-1.5">
+                  <Move className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-300">
+                    Mover Celular (X:{adminConfig.phonePosX ?? 0}px Y:{adminConfig.phonePosY ?? 0}px)
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  {(adminConfig.phonePosX !== 0 || adminConfig.phonePosY !== 0) && (
+                    <button
+                      type="button"
+                      title="Centralizar Celular"
+                      onClick={(e) => { e.stopPropagation(); onUpdateAdminConfig({ phonePosX: 0, phonePosY: 0 }); }}
+                      className="p-1 bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-black rounded transition cursor-pointer"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
               </div>
 
-              <SpinButton 
-                onSpin={onSpin} 
-                isSpinning={gameState.isSpinning}
-                label={adminConfig.spinButtonLabel || 'GIRAR'}
-                color={adminConfig.spinButtonColor || 'gold'}
+              {/* Background Media */}
+              <BackgroundMedia 
+                src={adminConfig.bgImage}
+                posX={adminConfig.bgPosX}
+                posY={adminConfig.bgPosY}
+                zoom={adminConfig.bgZoom}
+                mediaType={adminConfig.bgMediaType}
               />
 
-              <div className="w-9 h-9 rounded-full border border-white/10 bg-black/60 text-gray-400 flex flex-col items-center justify-center shadow-md">
-                <Play className="w-3.5 h-3.5 fill-current text-gray-400" />
-                <span className="text-[7px] font-black uppercase leading-none mt-0.5">Auto</span>
-              </div>
-            </div>
-
-            {/* Draggable Custom Buttons */}
-            {(adminConfig.customButtons || []).map((btn) => (
+              {/* Draggable Slot Frame */}
               <div
-                key={btn.id}
-                onMouseDown={(e) => handleStartDrag(`button-${btn.id}`, btn.posX, btn.posY, e.clientX, e.clientY)}
-                style={{
-                  position: 'absolute',
-                  top: `${btn.posY}%`,
-                  left: `${btn.posX}%`,
-                  transform: `translate(-50%, -50%) scale(${btn.scale / 100})`,
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  handleStartDrag('slot', adminConfig.slotLeft ?? 4, adminConfig.slotTop ?? 28, e.clientX, e.clientY);
+                  setNudgeTarget('slot');
                 }}
-                className={`z-30 cursor-move px-3 py-1.5 rounded-full text-xs font-black text-black shadow-lg border border-amber-300 flex items-center gap-1.5 ${btn.bgColor}`}
+                style={{
+                  top: `${adminConfig.slotTop ?? 28}%`,
+                  left: `${adminConfig.slotLeft ?? 4}%`,
+                  width: `${adminConfig.slotWidth ?? 92}%`,
+                  height: `${adminConfig.slotHeight ?? 38}%`,
+                  borderColor: adminConfig.slotHideOuterFrame ? 'transparent' : '#ffb700',
+                  borderWidth: adminConfig.slotHideOuterFrame ? '0px' : '4px',
+                  backgroundColor: adminConfig.slotHideOuterFrame ? 'transparent' : 'rgba(0,0,0,0.65)',
+                  boxShadow: adminConfig.slotHideOuterFrame ? 'none' : '0 10px 35px rgba(0,0,0,0.8)',
+                }}
+                className={`absolute cursor-move z-20 flex items-center justify-center rounded-2xl transition-all p-1 overflow-hidden border-solid ${
+                  nudgeTarget === 'slot' ? 'ring-2 ring-yellow-400 ring-offset-1 ring-offset-black' : ''
+                }`}
               >
-                {btn.imageUrl && (
-                  <img src={btn.imageUrl} alt={btn.label} className="w-4 h-4 object-contain rounded" />
+                <div className="w-full h-full pointer-events-none">
+                  <SlotMachine 
+                    isSpinning={gameState.isSpinning} 
+                    grid={previewGrid} 
+                    customSymbols={adminConfig.customSymbols}
+                    customSymbolConfigs={adminConfig.customSymbolConfigs}
+                    slotHideGrid={adminConfig.slotHideGrid}
+                    cashAnticipationColor={adminConfig.cashAnticipationColor ?? 'gold'}
+                    spinRollStyle={adminConfig.spinRollStyle ?? 'standard'}
+                  />
+                </div>
+
+                {/* 4 Corner handles for Slot Resizing */}
+                {nudgeTarget === 'slot' && (
+                  <div className="absolute inset-0 border-2 border-dashed border-yellow-400 pointer-events-none rounded-2xl z-40">
+                    <div 
+                      onMouseDown={(e) => handleStartResize('slot', 'tl', e)}
+                      className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 hover:bg-white active:bg-yellow-300 transition z-50 shadow-md"
+                      title="Arrastar para Redimensionar"
+                    />
+                    <div 
+                      onMouseDown={(e) => handleStartResize('slot', 'tr', e)}
+                      className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 hover:bg-white active:bg-yellow-300 transition z-50 shadow-md"
+                      title="Arrastar para Redimensionar"
+                    />
+                    <div 
+                      onMouseDown={(e) => handleStartResize('slot', 'bl', e)}
+                      className="absolute -bottom-1.5 -left-1.5 w-3.5 h-3.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 hover:bg-white active:bg-yellow-300 transition z-50 shadow-md"
+                      title="Arrastar para Redimensionar"
+                    />
+                    <div 
+                      onMouseDown={(e) => handleStartResize('slot', 'br', e)}
+                      className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 hover:bg-white active:bg-yellow-300 transition z-50 shadow-md"
+                      title="Arrastar para Redimensionar"
+                    />
+                  </div>
                 )}
-                <span>{btn.label}</span>
               </div>
-            ))}
 
-            {/* Draggable Custom Texts */}
-            {(adminConfig.customTexts || []).map((txt) => (
+              {/* Floating Buy Bonus Option */}
+              {adminConfig.enableBuyBonus !== false && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '71%',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                  }}
+                  className="z-20 px-3.5 py-1 bg-gradient-to-r from-yellow-500 via-amber-500 to-yellow-600 text-black font-black text-[10px] rounded-full shadow-[0_4px_15px_rgba(245,158,11,0.4)] border border-yellow-300 uppercase tracking-wider flex items-center gap-1 pointer-events-none select-none"
+                >
+                  <span>⭐ Comprar Bônus (x{adminConfig.buyBonusMultiplier ?? 50})</span>
+                </div>
+              )}
+
+              {/* Draggable Spin Button Cluster */}
               <div
-                key={txt.id}
-                onMouseDown={(e) => handleStartDrag(`text-${txt.id}`, txt.posX, txt.posY, e.clientX, e.clientY)}
-                style={{
-                  position: 'absolute',
-                  top: `${txt.posY}%`,
-                  left: `${txt.posX}%`,
-                  transform: 'translate(-50%, -50%)',
-                  fontSize: `${txt.fontSize}px`,
-                  color: txt.color,
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  handleStartDrag('spin', adminConfig.spinLeft ?? 50, 100 - (adminConfig.spinBottom ?? 4), e.clientX, e.clientY);
+                  setNudgeTarget('spin');
                 }}
-                className="z-30 cursor-move font-black tracking-wider uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
+                style={{
+                  bottom: `${adminConfig.spinBottom ?? 4}%`,
+                  left: `${adminConfig.spinLeft ?? 50}%`,
+                  transform: `translateX(-50%) scale(${(adminConfig.spinScale ?? 100) / 100})`,
+                }}
+                className={`absolute z-30 cursor-move flex items-center justify-center gap-2 transition-all duration-100 select-none ${
+                  nudgeTarget === 'spin' ? 'ring-2 ring-yellow-400 ring-offset-2 ring-offset-black rounded-full p-1' : ''
+                }`}
               >
-                {txt.text}
+                <div className="w-9 h-9 rounded-full border border-white/10 bg-black/60 text-gray-400 flex flex-col items-center justify-center shadow-md">
+                  <Zap className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-[7px] font-black uppercase leading-none mt-0.5">Turbo</span>
+                </div>
+
+                <SpinButton 
+                  onSpin={onSpin} 
+                  isSpinning={gameState.isSpinning}
+                  label={adminConfig.spinButtonLabel || 'GIRAR'}
+                  color={adminConfig.spinButtonColor || 'gold'}
+                />
+
+                <div className="w-9 h-9 rounded-full border border-white/10 bg-black/60 text-gray-400 flex flex-col items-center justify-center shadow-md">
+                  <Play className="w-3.5 h-3.5 fill-current text-gray-400" />
+                  <span className="text-[7px] font-black uppercase leading-none mt-0.5">Auto</span>
+                </div>
+
+                {/* Corner Resizing Handles */}
+                {nudgeTarget === 'spin' && (
+                  <div className="absolute -inset-2 border-2 border-dashed border-yellow-400 pointer-events-none rounded-full z-40">
+                    <div 
+                      onMouseDown={(e) => handleStartResize('spin', 'tl', e)}
+                      className="absolute -top-1 -left-1 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md"
+                    />
+                    <div 
+                      onMouseDown={(e) => handleStartResize('spin', 'tr', e)}
+                      className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md"
+                    />
+                    <div 
+                      onMouseDown={(e) => handleStartResize('spin', 'bl', e)}
+                      className="absolute -bottom-1 -left-1 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md"
+                    />
+                    <div 
+                      onMouseDown={(e) => handleStartResize('spin', 'br', e)}
+                      className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md"
+                    />
+                  </div>
+                )}
               </div>
-            ))}
+
+              {/* Draggable Custom Buttons */}
+              {(adminConfig.customButtons || []).map((btn) => (
+                <div
+                  key={btn.id}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    handleStartDrag(`button-${btn.id}`, btn.posX, btn.posY, e.clientX, e.clientY);
+                    setNudgeTarget(`button-${btn.id}` as any);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: `${btn.posY}%`,
+                    left: `${btn.posX}%`,
+                    transform: `translate(-50%, -50%) scale(${btn.scale / 100})`,
+                  }}
+                  className={`z-30 cursor-move px-3 py-1.5 rounded-full text-xs font-black text-black shadow-lg border border-amber-300 flex items-center gap-1.5 ${btn.bgColor} ${
+                    nudgeTarget === `button-${btn.id}` ? 'ring-2 ring-yellow-400 ring-offset-2 ring-offset-black' : ''
+                  }`}
+                >
+                  {btn.imageUrl && (
+                    <img src={btn.imageUrl} alt={btn.label} className="w-4 h-4 object-contain rounded" />
+                  )}
+                  <span>{btn.label}</span>
+
+                  {/* Resizing handles */}
+                  {nudgeTarget === `button-${btn.id}` && (
+                    <div className="absolute -inset-1.5 border-2 border-dashed border-yellow-400 pointer-events-none rounded-full z-40">
+                      <div 
+                        onMouseDown={(e) => handleStartResize(`button-${btn.id}`, 'tl', e)}
+                        className="absolute -top-1 -left-1 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md"
+                      />
+                      <div 
+                        onMouseDown={(e) => handleStartResize(`button-${btn.id}`, 'tr', e)}
+                        className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md"
+                      />
+                      <div 
+                        onMouseDown={(e) => handleStartResize(`button-${btn.id}`, 'bl', e)}
+                        className="absolute -bottom-1 -left-1 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md"
+                      />
+                      <div 
+                        onMouseDown={(e) => handleStartResize(`button-${btn.id}`, 'br', e)}
+                        className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md"
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* Draggable Custom Texts */}
+              {(adminConfig.customTexts || []).map((txt) => (
+                <div
+                  key={txt.id}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    handleStartDrag(`text-${txt.id}`, txt.posX, txt.posY, e.clientX, e.clientY);
+                    setNudgeTarget(`text-${txt.id}` as any);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: `${txt.posY}%`,
+                    left: `${txt.posX}%`,
+                    transform: 'translate(-50%, -50%)',
+                    fontSize: `${txt.fontSize}px`,
+                    color: txt.color,
+                  }}
+                  className={`z-30 cursor-move font-black tracking-wider uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] px-1 ${
+                    nudgeTarget === `text-${txt.id}` ? 'outline outline-2 outline-dashed outline-yellow-400 outline-offset-4 rounded' : ''
+                  }`}
+                >
+                  {txt.text}
+
+                  {/* Resizing handles */}
+                  {nudgeTarget === `text-${txt.id}` && (
+                    <>
+                      <div 
+                        onMouseDown={(e) => handleStartResize(`text-${txt.id}`, 'tl', e)}
+                        className="absolute -top-2.5 -left-2.5 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md"
+                      />
+                      <div 
+                        onMouseDown={(e) => handleStartResize(`text-${txt.id}`, 'tr', e)}
+                        className="absolute -top-2.5 -right-2.5 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md"
+                      />
+                      <div 
+                        onMouseDown={(e) => handleStartResize(`text-${txt.id}`, 'bl', e)}
+                        className="absolute -bottom-2.5 -left-2.5 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md"
+                      />
+                      <div 
+                        onMouseDown={(e) => handleStartResize(`text-${txt.id}`, 'br', e)}
+                        className="absolute -bottom-2.5 -right-2.5 w-2.5 h-2.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md"
+                      />
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Pixel Precision Control Panel (Painel de Ajuste Fino por Pixels) */}
