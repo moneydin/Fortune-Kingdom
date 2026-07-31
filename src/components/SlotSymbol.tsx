@@ -121,7 +121,7 @@ export const SlotSymbol: React.FC<SlotSymbolProps> = ({ type, isWinning, isBonus
           repeat: isWinning || isWild ? Infinity : 0, 
           ease: "easeInOut" 
         }}
-        className="w-full h-full flex items-center justify-center p-0.5"
+        className={`w-full h-full flex items-center justify-center ${isRealImageUrl ? 'p-0' : 'p-0.5'}`}
       >
         {getSymbolContent()}
       </motion.div>

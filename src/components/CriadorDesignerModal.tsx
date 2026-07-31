@@ -624,7 +624,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
     setResizeHandle(null);
   };
 
-  // Symbol Image File Upload: Default to CONTAIN (Full image, no cropping)
+  // Symbol Image File Upload: Default to COVER (Occupies full slot frame)
   const handleFileUploadForSymbol = (type: SymbolType, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -637,7 +637,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
             ...(adminConfig.customSymbolConfigs || {}),
             [type]: {
               url,
-              objectFit: 'contain' as const, // FULL UNCROPPED IMAGE BY DEFAULT!
+              objectFit: 'cover' as const, // OCCUPIES ENTIRE SLOT BY DEFAULT!
               offsetX: 0,
               offsetY: 0,
               scale: 100,
@@ -738,7 +738,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
           <span>Edição e Manipulação Livre de Símbolos</span>
         </h3>
         <p className="text-[10px] text-gray-300 leading-relaxed">
-          💡 Ao enviar uma nova imagem por upload, <strong className="text-amber-300">por padrão ela é carregada por inteiro sem cortes</strong> (<code className="text-yellow-300 font-mono">objectFit: contain</code>). Você pode alterar a escala (zoom), mover e posicioná-la livremente na tela!
+          💡 Ao enviar uma nova imagem por upload, <strong className="text-amber-300">por padrão ela preenche todo o quadro do slot</strong> (<code className="text-yellow-300 font-mono">objectFit: cover</code>). Você pode alterar a escala (zoom), mover e posicioná-la livremente na tela!
         </p>
       </div>
 
@@ -746,7 +746,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
         {SYMBOL_LIST.map(({ type, label }) => {
           const currentConfig = adminConfig.customSymbolConfigs?.[type] || {
             url: adminConfig.customSymbols?.[type] || '',
-            objectFit: 'contain',
+            objectFit: 'cover',
             offsetX: 0,
             offsetY: 0,
             scale: 100,
@@ -906,7 +906,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => updateSymConfig({ offsetX: 0, offsetY: 0, scale: 100, objectFit: 'contain' })}
+                  onClick={() => updateSymConfig({ offsetX: 0, offsetY: 0, scale: 100, objectFit: 'cover' })}
                   className="px-2.5 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 hover:text-white rounded-lg text-[10px] font-bold shrink-0"
                   title="Resetar Posição e Zoom"
                 >
@@ -3050,11 +3050,15 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
           {/* Preview Control Header: Tabuleiro e Rolagem Selector Bar (Draggable) */}
           <div 
             style={{
+              position: 'absolute',
+              top: '16px',
+              left: '50%',
+              marginLeft: `-${toolbarWidth / 2}px`,
               width: `${toolbarWidth}px`,
               maxWidth: '95vw',
               transform: `translate(${adminConfig.toolbarPosX ?? 0}px, ${adminConfig.toolbarPosY ?? 0}px)`
             }}
-            className="bg-black/95 backdrop-blur-md border-2 border-amber-500/60 rounded-2xl p-3 mb-3 shadow-[0_0_35px_rgba(245,158,11,0.35)] z-30 space-y-2.5 select-none relative transition-all duration-75"
+            className="bg-black/95 backdrop-blur-md border-2 border-amber-500/60 rounded-2xl p-3 shadow-[0_0_35px_rgba(245,158,11,0.35)] z-30 space-y-2.5 select-none absolute transition-all duration-75"
           >
             {/* Header: Draggable Grip and Reset */}
             <div 
