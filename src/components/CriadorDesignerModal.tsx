@@ -3810,6 +3810,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                     slotHideGrid={adminConfig.slotHideGrid}
                     cashAnticipationColor={adminConfig.cashAnticipationColor ?? 'gold'}
                     spinRollStyle={adminConfig.spinRollStyle ?? 'standard'}
+                    boardType={adminConfig.boardType}
                   />
                 </div>
 

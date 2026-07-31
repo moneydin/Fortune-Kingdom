@@ -237,7 +237,7 @@ export const SlotReel: React.FC<SlotReelProps> = ({
   return (
     <div 
       style={maxRows ? { height: `${(rowsCount / maxRows) * 100}%` } : undefined}
-      className={`relative flex-1 h-full max-w-[150px] overflow-hidden flex flex-col transition-all duration-300 ${
+      className={`relative flex-1 ${maxRows ? '' : 'h-full'} max-w-[150px] overflow-hidden flex flex-col transition-all duration-300 ${
       noSlotMargins || slotHideGrid
         ? 'bg-transparent border-none shadow-none' 
         : 'bg-black/75 rounded-xl border-x border-[#4d3d00]/60 shadow-[inset_0_0_20px_rgba(0,0,0,0.9)]'

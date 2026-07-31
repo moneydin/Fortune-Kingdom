@@ -1192,6 +1192,7 @@ export default function App() {
             anticipationExtraDelay={gameSettings.turboMode ? 800 : 2000}
             cashAnticipationColor={adminConfig.cashAnticipationColor ?? 'gold'}
             spinRollStyle={adminConfig.spinRollStyle ?? 'standard'}
+            boardType={adminConfig.boardType}
           />
         </div>
 
