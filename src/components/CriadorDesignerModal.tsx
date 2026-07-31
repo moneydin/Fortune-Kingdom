@@ -172,7 +172,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
     startFontSize: 14,
   });
 
-  const handleStartResize = (target: string, handle: 'tl' | 'tr' | 'bl' | 'br', e: React.MouseEvent) => {
+  const handleStartResize = (target: string, handle: 'tl' | 'tr' | 'bl' | 'br', e: React.MouseEvent | React.PointerEvent) => {
     e.stopPropagation();
     e.preventDefault();
     setResizingTarget(target);
@@ -448,7 +448,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
     dragStartRef.current = { x: clientX, y: clientY, initialX, initialY };
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handleMouseMove = (e: React.MouseEvent | React.PointerEvent) => {
     if (resizingTarget && resizeHandle && previewCanvasRef.current) {
       const rect = previewCanvasRef.current.getBoundingClientRect();
       const deltaX = e.clientX - resizeStartRef.current.x;
@@ -897,8 +897,8 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
               {/* Interactive Drag & Pan Pad */}
               <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-2">
                 <div
-                  onMouseDown={(e) => handleStartDrag(`symbol-pan-${type}`, currentConfig.offsetX || 0, currentConfig.offsetY || 0, e.clientX, e.clientY)}
-                  className="w-full py-2 bg-neutral-900 hover:bg-neutral-800 border border-white/20 rounded-lg text-center cursor-move text-xs font-bold text-amber-300 flex items-center justify-center gap-2 select-none"
+                  onPointerDown={(e) => handleStartDrag(`symbol-pan-${type}`, currentConfig.offsetX || 0, currentConfig.offsetY || 0, e.clientX, e.clientY)}
+                  className="w-full py-2 bg-neutral-900 hover:bg-neutral-800 border border-white/20 rounded-lg text-center cursor-move text-xs font-bold text-amber-300 flex items-center justify-center gap-2 select-none touch-none"
                   title="Clique e arraste para posicionar a imagem livremente"
                 >
                   <Move className="w-4 h-4 text-amber-400 animate-bounce" />
@@ -2137,29 +2137,27 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
       
       {/* Studio Top Header Bar */}
       {!isFocusMode && (
-        <header className="w-full bg-[#0b0c12] border-b border-red-500/30 px-4 py-2.5 flex items-center justify-between shrink-0 shadow-2xl">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-600 via-amber-500 to-yellow-400 p-0.5 shadow-[0_0_20px_rgba(239,68,68,0.6)]">
+        <header className="w-full bg-[#0b0c12] border-b border-red-500/30 px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between shrink-0 shadow-2xl">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-red-600 via-amber-500 to-yellow-400 p-0.5 shadow-[0_0_20px_rgba(239,68,68,0.6)] shrink-0 hidden xs:flex">
               <div className="w-full h-full bg-black rounded-[10px] flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-amber-400 animate-pulse" />
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 animate-pulse" />
               </div>
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 uppercase">
-                  ESTÚDIO ENGINE DE CRIAÇÃO DE SLOT
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <h1 className="text-xs sm:text-base font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400 uppercase truncate">
+                  Estúdio Slot
                 </h1>
-                <span className="bg-red-950/90 border border-red-500/50 text-red-300 text-[9px] font-black px-2 py-0.5 rounded-full tracking-widest uppercase shadow">
-                  Professional v3.0
+                <span className="bg-red-950/90 border border-red-500/50 text-red-300 text-[8px] sm:text-[9px] font-black px-1.5 sm:px-2 py-0.5 rounded-full tracking-widest uppercase shadow shrink-0 hidden sm:inline-block">
+                  v3.0
                 </span>
               </div>
-              <p className="text-[10px] text-gray-400 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                <span>RTP Ativo: <b>{adminConfig.targetRtp}%</b></span>
+              <p className="text-[9px] sm:text-[10px] text-gray-400 flex items-center gap-1 sm:gap-1.5 hidden xs:flex">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                <span>RTP: <b>{adminConfig.targetRtp}%</b></span>
                 <span className="text-gray-600">•</span>
                 <span>Motor: <b>{adminConfig.boardType || '5x3'}</b></span>
-                <span className="text-gray-600">•</span>
-                <span>GGR: <b className="text-emerald-400">R$ {calculatedGgr}</b></span>
               </p>
             </div>
           </div>
@@ -2254,37 +2252,37 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
           </div>
 
           {/* Right Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               type="button"
               onClick={() => setIsFocusMode(!isFocusMode)}
-              className={`p-2 rounded-xl transition cursor-pointer border flex items-center gap-1.5 text-xs font-black ${
+              className={`p-1.5 sm:p-2 rounded-xl transition cursor-pointer border flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs font-black ${
                 isFocusMode 
-                  ? 'bg-amber-500 text-black border-amber-400 font-black shadow-[0_0_15px_rgba(245,158,11,0.5)] scale-105' 
+                  ? 'bg-amber-500 text-black border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.5)] scale-105' 
                   : 'bg-white/5 hover:bg-white/10 text-gray-300 border-white/10'
               }`}
               title={isFocusMode ? "Sair do Modo Foco (Mostrar Painel Lateral)" : "Entrar no Modo Foco (Ocular Painel Lateral)"}
             >
-              {isFocusMode ? <Minimize2 className="w-4 h-4 text-black animate-pulse" /> : <Maximize2 className="w-4 h-4 text-amber-400" />}
-              <span>{isFocusMode ? "Modo Normal" : "Modo Foco (Tela Cheia)"}</span>
+              {isFocusMode ? <Minimize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-black animate-pulse" /> : <Maximize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />}
+              <span className="hidden sm:inline">{isFocusMode ? "Modo Normal" : "Modo Foco"}</span>
             </button>
 
             <button
               type="button"
               onClick={() => setIsLocked(true)}
-              className="p-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-xl transition cursor-pointer border border-white/10"
+              className="p-1.5 sm:p-2 bg-white/5 hover:bg-white/10 text-gray-300 rounded-xl transition cursor-pointer border border-white/10 hidden sm:block"
               title="Bloquear Painel"
             >
-              <Lock className="w-4 h-4 text-amber-400" />
+              <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
             </button>
 
             <button
               type="button"
               onClick={onClose}
-              className="p-2 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 active:scale-95 text-white rounded-xl transition cursor-pointer flex items-center gap-1.5 text-xs font-black shadow-lg border border-red-400/40"
+              className="p-1.5 sm:p-2 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 active:scale-95 text-white rounded-xl transition cursor-pointer flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs font-black shadow-lg border border-red-400/40"
             >
-              <X className="w-4 h-4" />
-              <span>Fechar Estúdio</span>
+              <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span>Sair</span>
             </button>
           </div>
         </header>
@@ -2430,7 +2428,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
         {/* Right Studio Canvas: Interactive Live Simulator Stage (7 Cols) */}
         <div 
           ref={previewCanvasRef}
-          onMouseDown={(e) => {
+          onPointerDown={(e) => {
             const isMiddleClick = e.button === 1;
             const isClickingCanvasVoid = e.target === previewCanvasRef.current || (e.target as HTMLElement).classList.contains('canvas-void');
             
@@ -2438,10 +2436,10 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
               handleStartDrag('canvas', canvasPanX, canvasPanY, e.clientX, e.clientY);
             }
           }}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          className={`${isFocusMode ? 'lg:col-span-12' : 'lg:col-span-7'} bg-[#040508] p-4 flex flex-col items-center justify-center relative overflow-hidden select-none min-h-[500px] transition-all duration-300 ${canvasTool === 'hand' ? 'cursor-grab active:cursor-grabbing' : ''}`}
+          onPointerMove={handleMouseMove}
+          onPointerUp={handleMouseUp}
+          onPointerLeave={handleMouseUp}
+          className={`${isFocusMode ? 'lg:col-span-12' : 'lg:col-span-7'} bg-[#040508] p-4 flex flex-col items-center justify-center relative overflow-hidden select-none min-h-[500px] transition-all duration-300 touch-none ${canvasTool === 'hand' ? 'cursor-grab active:cursor-grabbing' : ''}`}
         >
           {/* Alignment Crosshairs Overlay */}
           {showGridLines && (
@@ -2468,11 +2466,11 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
           >
             {/* Tool Selection and Zoom controls group */}
             <div 
-              onMouseDown={(e) => {
-                if (e.button !== 0 || (e.target as HTMLElement).closest('button')) return;
+              onPointerDown={(e) => {
+                if ((e.target as HTMLElement).closest('button')) return;
                 handleStartDrag('hudController', hudControllerPos.x, hudControllerPos.y, e.clientX, e.clientY);
               }}
-              className="bg-black/85 backdrop-blur-md border border-white/10 p-1.5 rounded-xl flex items-center gap-1.5 shadow-2xl cursor-grab active:cursor-grabbing hover:bg-neutral-900 transition-colors"
+              className="bg-black/85 backdrop-blur-md border border-white/10 p-1.5 rounded-xl flex items-center gap-1.5 shadow-2xl cursor-grab active:cursor-grabbing hover:bg-neutral-900 transition-colors touch-none"
               title="Arraste para mover as ferramentas"
             >
               {/* Draggable Grip */}
@@ -2616,8 +2614,8 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
               >
                 {/* Panel Drag Header */}
                 <div
-                  onMouseDown={(e) => handleStartDrag(`panel-${panelId}`, config.x, config.y, e.clientX, e.clientY)}
-                  className="flex items-center justify-between bg-neutral-900 px-3 py-2 border-b border-white/10 cursor-grab active:cursor-grabbing select-none shrink-0"
+                  onPointerDown={(e) => handleStartDrag(`panel-${panelId}`, config.x, config.y, e.clientX, e.clientY)}
+                  className="flex items-center justify-between bg-neutral-900 px-3 py-2 border-b border-white/10 cursor-grab active:cursor-grabbing select-none shrink-0 touch-none"
                 >
                   <div className="flex items-center gap-1.5">
                     <GripHorizontal className="w-3.5 h-3.5 text-amber-500 shrink-0" />
@@ -2670,11 +2668,11 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
             >
               {/* Header with Grip & Actions */}
               <div 
-                onMouseDown={(e) => {
-                  if (e.button !== 0 || (e.target as HTMLElement).closest('button')) return;
+                onPointerDown={(e) => {
+                  if ((e.target as HTMLElement).closest('button')) return;
                   handleStartDrag('precisionPanel', precisionPanelPos.x, precisionPanelPos.y, e.clientX, e.clientY);
                 }}
-                className="flex items-center justify-between border-b border-white/10 pb-1.5 cursor-grab active:cursor-grabbing hover:bg-white/5 px-1 rounded transition"
+                className="flex items-center justify-between border-b border-white/10 pb-1.5 cursor-grab active:cursor-grabbing hover:bg-white/5 px-1 rounded transition touch-none"
               >
                 <div className="flex items-center gap-1.5">
                   <GripHorizontal className="w-3.5 h-3.5 text-amber-500" />
@@ -3063,8 +3061,8 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
           >
             {/* Header: Draggable Grip and Reset */}
             <div 
-              onMouseDown={(e) => handleStartDrag('toolbar', adminConfig.toolbarPosX ?? 0, adminConfig.toolbarPosY ?? 0, e.clientX, e.clientY)}
-              className="flex items-center justify-between border-b border-white/10 pb-1.5 cursor-grab active:cursor-grabbing hover:bg-white/5 px-1.5 py-1 rounded-lg transition"
+              onPointerDown={(e) => handleStartDrag('toolbar', adminConfig.toolbarPosX ?? 0, adminConfig.toolbarPosY ?? 0, e.clientX, e.clientY)}
+              className="flex items-center justify-between border-b border-white/10 pb-1.5 cursor-grab active:cursor-grabbing hover:bg-white/5 px-1.5 py-1 rounded-lg transition touch-none"
             >
               <div className="flex items-center gap-1.5">
                 <GripHorizontal className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
@@ -3701,23 +3699,23 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                   ×
                 </button>
                 <div 
-                  onMouseDown={(e) => handleStartResize('phone', 'tl', e)}
-                  className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                  onPointerDown={(e) => handleStartResize('phone', 'tl', e)}
+                  className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                   title="Arrastar para Redimensionar"
                 />
                 <div 
-                  onMouseDown={(e) => handleStartResize('phone', 'tr', e)}
-                  className="absolute -top-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                  onPointerDown={(e) => handleStartResize('phone', 'tr', e)}
+                  className="absolute -top-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                   title="Arrastar para Redimensionar"
                 />
                 <div 
-                  onMouseDown={(e) => handleStartResize('phone', 'bl', e)}
-                  className="absolute -bottom-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                  onPointerDown={(e) => handleStartResize('phone', 'bl', e)}
+                  className="absolute -bottom-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                   title="Arrastar para Redimensionar"
                 />
                 <div 
-                  onMouseDown={(e) => handleStartResize('phone', 'br', e)}
-                  className="absolute -bottom-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                  onPointerDown={(e) => handleStartResize('phone', 'br', e)}
+                  className="absolute -bottom-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                   title="Arrastar para Redimensionar"
                 />
               </div>
@@ -3739,10 +3737,10 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
 
               {/* Clickable drag handler layer for Background Media */}
               <div 
-                className={`absolute inset-0 z-0 cursor-grab active:cursor-grabbing ${
+                className={`absolute inset-0 z-0 cursor-grab active:cursor-grabbing touch-none ${
                   nudgeTarget === 'background' ? 'ring-4 ring-dashed ring-amber-500/85 ring-inset rounded-[30px]' : ''
                 }`}
-                onMouseDown={(e) => {
+                onPointerDown={(e) => {
                   e.stopPropagation();
                   handleStartDrag('background', adminConfig.bgPosX ?? 0, adminConfig.bgPosY ?? 0, e.clientX, e.clientY);
                   setNudgeTarget('background');
@@ -3757,23 +3755,23 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
               {nudgeTarget === 'background' && (
                 <div className="absolute inset-0 pointer-events-none z-10 rounded-[30px] overflow-hidden">
                   <div 
-                    onMouseDown={(e) => handleStartResize('background', 'tl', e)}
-                    className="absolute top-4 left-4 w-4 h-4 bg-amber-500 border border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                    onPointerDown={(e) => handleStartResize('background', 'tl', e)}
+                    className="absolute top-4 left-4 w-4 h-4 bg-amber-500 border border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                     title="Zoom da Imagem (Arrastar)"
                   />
                   <div 
-                    onMouseDown={(e) => handleStartResize('background', 'tr', e)}
-                    className="absolute top-4 right-4 w-4 h-4 bg-amber-500 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                    onPointerDown={(e) => handleStartResize('background', 'tr', e)}
+                    className="absolute top-4 right-4 w-4 h-4 bg-amber-500 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                     title="Zoom da Imagem (Arrastar)"
                   />
                   <div 
-                    onMouseDown={(e) => handleStartResize('background', 'bl', e)}
-                    className="absolute bottom-4 left-4 w-4 h-4 bg-amber-500 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                    onPointerDown={(e) => handleStartResize('background', 'bl', e)}
+                    className="absolute bottom-4 left-4 w-4 h-4 bg-amber-500 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                     title="Zoom da Imagem (Arrastar)"
                   />
                   <div 
-                    onMouseDown={(e) => handleStartResize('background', 'br', e)}
-                    className="absolute bottom-4 right-4 w-4 h-4 bg-amber-500 border border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                    onPointerDown={(e) => handleStartResize('background', 'br', e)}
+                    className="absolute bottom-4 right-4 w-4 h-4 bg-amber-500 border border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                     title="Zoom da Imagem (Arrastar)"
                   />
                 </div>
@@ -3781,7 +3779,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
 
               {/* Draggable Slot Frame */}
               <div
-                onMouseDown={(e) => {
+                onPointerDown={(e) => {
                   e.stopPropagation();
                   handleStartDrag('slot', adminConfig.slotLeft ?? 4, adminConfig.slotTop ?? 28, e.clientX, e.clientY);
                   setNudgeTarget('slot');
@@ -3797,7 +3795,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                   backgroundColor: adminConfig.slotHideOuterFrame ? 'transparent' : 'rgba(0,0,0,0.65)',
                   boxShadow: adminConfig.slotHideOuterFrame ? 'none' : '0 10px 35px rgba(0,0,0,0.8)',
                 }}
-                className={`absolute cursor-move z-20 flex items-center justify-center rounded-2xl transition-all p-1 border-solid ${
+                className={`absolute cursor-move z-20 flex items-center justify-center rounded-2xl transition-all p-1 border-solid touch-none ${
                   nudgeTarget === 'slot' ? 'ring-2 ring-yellow-400 ring-offset-1 ring-offset-black' : ''
                 }`}
               >
@@ -3829,23 +3827,23 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                       ×
                     </button>
                     <div 
-                      onMouseDown={(e) => handleStartResize('slot', 'tl', e)}
-                      className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                      onPointerDown={(e) => handleStartResize('slot', 'tl', e)}
+                      className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                       title="Arrastar para Redimensionar"
                     />
                     <div 
-                      onMouseDown={(e) => handleStartResize('slot', 'tr', e)}
-                      className="absolute -top-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                      onPointerDown={(e) => handleStartResize('slot', 'tr', e)}
+                      className="absolute -top-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                       title="Arrastar para Redimensionar"
                     />
                     <div 
-                      onMouseDown={(e) => handleStartResize('slot', 'bl', e)}
-                      className="absolute -bottom-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                      onPointerDown={(e) => handleStartResize('slot', 'bl', e)}
+                      className="absolute -bottom-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                       title="Arrastar para Redimensionar"
                     />
                     <div 
-                      onMouseDown={(e) => handleStartResize('slot', 'br', e)}
-                      className="absolute -bottom-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                      onPointerDown={(e) => handleStartResize('slot', 'br', e)}
+                      className="absolute -bottom-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                       title="Arrastar para Redimensionar"
                     />
                   </div>
@@ -3855,7 +3853,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
               {/* Floating Buy Bonus Option */}
               {adminConfig.enableBuyBonus !== false && (
                 <div
-                  onMouseDown={(e) => {
+                  onPointerDown={(e) => {
                     e.stopPropagation();
                     handleStartDrag('buyBonus', adminConfig.buyBonusPosX ?? 50, adminConfig.buyBonusPosY ?? 71, e.clientX, e.clientY);
                     setNudgeTarget('buyBonus');
@@ -3867,7 +3865,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                     left: `${adminConfig.buyBonusPosX ?? 50}%`,
                     transform: `translate(-50%, -50%) scale(${(adminConfig.buyBonusScale ?? 100) / 100})`,
                   }}
-                  className={`z-30 px-3.5 py-1.5 bg-gradient-to-r from-yellow-500 via-amber-500 to-yellow-600 text-black font-black text-[10px] rounded-full shadow-[0_4px_15px_rgba(245,158,11,0.4)] border border-yellow-300 uppercase tracking-wider flex items-center gap-1 cursor-move select-none transition-all ${
+                  className={`z-30 px-3.5 py-1.5 bg-gradient-to-r from-yellow-500 via-amber-500 to-yellow-600 text-black font-black text-[10px] rounded-full shadow-[0_4px_15px_rgba(245,158,11,0.4)] border border-yellow-300 uppercase tracking-wider flex items-center gap-1 cursor-move select-none transition-all touch-none ${
                     nudgeTarget === 'buyBonus' ? 'ring-2 ring-yellow-400 ring-offset-2 ring-offset-black' : ''
                   }`}
                 >
@@ -3890,11 +3888,11 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                         ×
                       </button>
                       <div 
-                        onMouseDown={(e) => {
+                        onPointerDown={(e) => {
                           e.stopPropagation();
                           handleStartResize('buyBonus', 'tr', e);
                         }}
-                        className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center"
+                        className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-yellow-400 border border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center touch-none"
                         title="Arrastar para Redimensionar"
                       />
                     </div>
@@ -3904,7 +3902,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
 
               {/* Draggable Spin Button Cluster */}
               <div
-                onMouseDown={(e) => {
+                onPointerDown={(e) => {
                   e.stopPropagation();
                   handleStartDrag('spin', adminConfig.spinLeft ?? 50, 100 - (adminConfig.spinBottom ?? 4), e.clientX, e.clientY);
                   setNudgeTarget('spin');
@@ -3915,7 +3913,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                   left: `${adminConfig.spinLeft ?? 50}%`,
                   transform: `translateX(-50%) scale(${(adminConfig.spinScale ?? 100) / 100})`,
                 }}
-                className={`absolute z-30 cursor-move flex items-center justify-center gap-2 transition-all duration-100 select-none ${
+                className={`absolute z-30 cursor-move flex items-center justify-center gap-2 transition-all duration-100 select-none touch-none ${
                   nudgeTarget === 'spin' ? 'ring-2 ring-yellow-400 ring-offset-2 ring-offset-black rounded-full p-1' : ''
                 }`}
               >
@@ -3951,23 +3949,23 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                       ×
                     </button>
                     <div 
-                      onMouseDown={(e) => handleStartResize('spin', 'tl', e)}
-                      className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                      onPointerDown={(e) => handleStartResize('spin', 'tl', e)}
+                      className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                       title="Arrastar para Redimensionar"
                     />
                     <div 
-                      onMouseDown={(e) => handleStartResize('spin', 'tr', e)}
-                      className="absolute -top-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                      onPointerDown={(e) => handleStartResize('spin', 'tr', e)}
+                      className="absolute -top-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                       title="Arrastar para Redimensionar"
                     />
                     <div 
-                      onMouseDown={(e) => handleStartResize('spin', 'bl', e)}
-                      className="absolute -bottom-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                      onPointerDown={(e) => handleStartResize('spin', 'bl', e)}
+                      className="absolute -bottom-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                       title="Arrastar para Redimensionar"
                     />
                     <div 
-                      onMouseDown={(e) => handleStartResize('spin', 'br', e)}
-                      className="absolute -bottom-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                      onPointerDown={(e) => handleStartResize('spin', 'br', e)}
+                      className="absolute -bottom-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                       title="Arrastar para Redimensionar"
                     />
                   </div>
@@ -3978,7 +3976,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
               {(adminConfig.customButtons || []).map((btn) => (
                 <div
                   key={btn.id}
-                  onMouseDown={(e) => {
+                  onPointerDown={(e) => {
                     e.stopPropagation();
                     handleStartDrag(`button-${btn.id}`, btn.posX, btn.posY, e.clientX, e.clientY);
                     setNudgeTarget(`button-${btn.id}` as any);
@@ -3992,7 +3990,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                     width: btn.customWidth ? `${btn.customWidth}px` : undefined,
                     height: btn.customHeight ? `${btn.customHeight}px` : undefined,
                   }}
-                  className={`z-30 cursor-move whitespace-nowrap select-none ${getCustomButtonStyles(btn)}`}
+                  className={`z-30 cursor-move whitespace-nowrap select-none touch-none ${getCustomButtonStyles(btn)}`}
                 >
                   {btn.imageUrl && (
                     <img src={btn.imageUrl} alt={btn.label} className="w-4 h-4 object-contain rounded" />
@@ -4014,23 +4012,23 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                         ×
                       </button>
                       <div 
-                        onMouseDown={(e) => handleStartResize(`button-${btn.id}`, 'tl', e)}
-                        className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                        onPointerDown={(e) => handleStartResize(`button-${btn.id}`, 'tl', e)}
+                        className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                         title="Arrastar para Redimensionar"
                       />
                       <div 
-                        onMouseDown={(e) => handleStartResize(`button-${btn.id}`, 'tr', e)}
-                        className="absolute -top-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                        onPointerDown={(e) => handleStartResize(`button-${btn.id}`, 'tr', e)}
+                        className="absolute -top-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                         title="Arrastar para Redimensionar"
                       />
                       <div 
-                        onMouseDown={(e) => handleStartResize(`button-${btn.id}`, 'bl', e)}
-                        className="absolute -bottom-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                        onPointerDown={(e) => handleStartResize(`button-${btn.id}`, 'bl', e)}
+                        className="absolute -bottom-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                         title="Arrastar para Redimensionar"
                       />
                       <div 
-                        onMouseDown={(e) => handleStartResize(`button-${btn.id}`, 'br', e)}
-                        className="absolute -bottom-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                        onPointerDown={(e) => handleStartResize(`button-${btn.id}`, 'br', e)}
+                        className="absolute -bottom-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                         title="Arrastar para Redimensionar"
                       />
                     </div>
@@ -4042,7 +4040,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
               {(adminConfig.customTexts || []).map((txt) => (
                 <div
                   key={txt.id}
-                  onMouseDown={(e) => {
+                  onPointerDown={(e) => {
                     e.stopPropagation();
                     handleStartDrag(`text-${txt.id}`, txt.posX, txt.posY, e.clientX, e.clientY);
                     setNudgeTarget(`text-${txt.id}` as any);
@@ -4056,7 +4054,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                     fontSize: `${txt.fontSize}px`,
                     color: txt.color,
                   }}
-                  className="z-30 cursor-move font-black tracking-wider uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] px-1 relative"
+                  className="z-30 cursor-move font-black tracking-wider uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] px-1 relative touch-none"
                 >
                   {txt.text}
 
@@ -4075,23 +4073,23 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                         ×
                       </button>
                       <div 
-                        onMouseDown={(e) => handleStartResize(`text-${txt.id}`, 'tl', e)}
-                        className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                        onPointerDown={(e) => handleStartResize(`text-${txt.id}`, 'tl', e)}
+                        className="absolute -top-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                         title="Arrastar para Redimensionar"
                       />
                       <div 
-                        onMouseDown={(e) => handleStartResize(`text-${txt.id}`, 'tr', e)}
-                        className="absolute -top-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                        onPointerDown={(e) => handleStartResize(`text-${txt.id}`, 'tr', e)}
+                        className="absolute -top-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                         title="Arrastar para Redimensionar"
                       />
                       <div 
-                        onMouseDown={(e) => handleStartResize(`text-${txt.id}`, 'bl', e)}
-                        className="absolute -bottom-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                        onPointerDown={(e) => handleStartResize(`text-${txt.id}`, 'bl', e)}
+                        className="absolute -bottom-2.5 -left-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nesw-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                         title="Arrastar para Redimensionar"
                       />
                       <div 
-                        onMouseDown={(e) => handleStartResize(`text-${txt.id}`, 'br', e)}
-                        className="absolute -bottom-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse"
+                        onPointerDown={(e) => handleStartResize(`text-${txt.id}`, 'br', e)}
+                        className="absolute -bottom-2.5 -right-2.5 w-5 h-5 bg-yellow-400 border-2 border-black rounded-full pointer-events-auto cursor-nwse-resize hover:scale-125 transition z-50 shadow-md flex items-center justify-center animate-pulse touch-none"
                         title="Arrastar para Redimensionar"
                       />
                     </div>
