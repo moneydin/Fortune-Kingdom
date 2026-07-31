@@ -209,6 +209,7 @@ export function getBoardDimensions(boardType: BoardType): { cols: number; rows: 
   switch (boardType) {
     case '3x1': return { cols: 3, rows: 1 };
     case '3x3': return { cols: 3, rows: 3 };
+    case '3x4x3': return { cols: 3, rows: 4 };
     case '4x3': return { cols: 4, rows: 3 };
     case '4x4': return { cols: 4, rows: 4 };
     case '5x4': return { cols: 5, rows: 4 };
@@ -219,6 +220,14 @@ export function getBoardDimensions(boardType: BoardType): { cols: number; rows: 
     default:
       return { cols: 5, rows: 3 };
   }
+}
+
+export function getReelRowCount(boardType: BoardType, colIndex: number): number {
+  if (boardType === '3x4x3') {
+    return colIndex === 1 ? 4 : 3;
+  }
+  const { rows } = getBoardDimensions(boardType);
+  return rows;
 }
 
 // ---------------------------------------------------------
@@ -268,12 +277,13 @@ export function generateBoardGrid(
   boardType: BoardType,
   symbols: SlotSymbolConfig[]
 ): string[][] {
-  const { cols, rows } = getBoardDimensions(boardType);
+  const { cols } = getBoardDimensions(boardType);
   const grid: string[][] = [];
 
   for (let c = 0; c < cols; c++) {
     const colSymbols: string[] = [];
-    for (let r = 0; r < rows; r++) {
+    const actualRows = getReelRowCount(boardType, c);
+    for (let r = 0; r < actualRows; r++) {
       const selectedSym = getRandomSymbolWeighted(symbols);
       colSymbols.push(selectedSym.id);
     }
@@ -328,12 +338,13 @@ export function getValidPaylinesForBoard(
   boardType: BoardType,
   paylines: PaylineConfig[]
 ): PaylineConfig[] {
-  const { cols, rows } = getBoardDimensions(boardType);
+  const { cols } = getBoardDimensions(boardType);
 
   const filtered = paylines.filter(line => {
     if (!line.isActive) return false;
     return line.coordinates.every(coord => {
-      return coord.col >= 0 && coord.col < cols && coord.row >= 0 && coord.row < rows;
+      const actualRows = getReelRowCount(boardType, coord.col);
+      return coord.col >= 0 && coord.col < cols && coord.row >= 0 && coord.row < actualRows;
     });
   });
 
@@ -341,9 +352,10 @@ export function getValidPaylinesForBoard(
     return filtered;
   }
 
-  // Fallback dynamic paylines generator for any board size (e.g. 4x3, 6x4, 7x7)
+  // Fallback dynamic paylines generator for any board size (e.g. 4x3, 6x4, 7x7, 3x4x3)
   const dynamicLines: PaylineConfig[] = [];
-  for (let r = 0; r < rows; r++) {
+  const minRows = Math.min(...Array.from({ length: cols }).map((_, c) => getReelRowCount(boardType, c)));
+  for (let r = 0; r < minRows; r++) {
     const coords = [];
     for (let c = 0; c < cols; c++) {
       coords.push({ col: c, row: r });
@@ -417,7 +429,7 @@ export function evaluateBoardWins(
         symbolId: bestFsSymbol.id,
         symbolName: bestFsSymbol.name,
         coordinates: grid.flatMap((col, colIdx) => col.map((_, rowIdx) => ({ col: colIdx, row: rowIdx }))),
-        matchCount: grid.length * (grid[0]?.length || 1),
+        matchCount: grid.reduce((sum, col) => sum + col.length, 0),
         multiplier: bestFsMultiplier,
         payoutAmount: fsPayout,
       }],

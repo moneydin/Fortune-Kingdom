@@ -46,6 +46,7 @@ const SYMBOL_LIST: { type: SymbolType; label: string }[] = [
 const BOARD_OPTIONS: { id: BoardType; label: string; desc: string }[] = [
   { id: '3x1', label: '3x1', desc: 'Retrô 1 Linha (3×1)' },
   { id: '3x3', label: '3x3', desc: 'Clássico 3x3 (3×3)' },
+  { id: '3x4x3', label: '3x4x3', desc: 'Asimétrico (3-4-3)' },
   { id: '4x3', label: '4x3', desc: 'Moderno 4x3 (4×3)' },
   { id: '4x4', label: '4x4', desc: 'Quadrado 4x4 (4×4)' },
   { id: '5x3', label: '5x3', desc: 'Padrão Slot (5×3)' },

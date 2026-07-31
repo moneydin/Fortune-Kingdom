@@ -21,6 +21,7 @@ interface SlotReelProps {
   slotHideGrid?: boolean;
   anticipationColor?: 'gold' | 'red' | 'purple' | 'cyan' | 'neon_green';
   spinRollStyle?: SpinRollStyle;
+  maxRows?: number;
 }
 
 const ALL_SYMBOLS: string[] = ['King', 'Queen', 'Crown', 'Lion', 'Sword', 'Shield', 'Castle', 'Diamond', 'Coin', 'Dragon'];
@@ -75,7 +76,8 @@ export const SlotReel: React.FC<SlotReelProps> = ({
   bonusPulsingRows = [],
   slotHideGrid = false,
   anticipationColor = 'gold',
-  spinRollStyle = 'standard'
+  spinRollStyle = 'standard',
+  maxRows
 }) => {
   const [currentSymbols, setCurrentSymbols] = useState<string[]>(resultSymbols);
   const [reelSpinning, setReelSpinning] = useState<boolean>(false);
@@ -233,7 +235,9 @@ export const SlotReel: React.FC<SlotReelProps> = ({
   const antStyle = ANTICIPATION_STYLES[anticipationColor] || ANTICIPATION_STYLES.gold;
 
   return (
-    <div className={`relative flex-1 h-full max-w-[150px] overflow-hidden flex flex-col transition-all duration-300 ${
+    <div 
+      style={maxRows ? { height: `${(rowsCount / maxRows) * 100}%` } : undefined}
+      className={`relative flex-1 h-full max-w-[150px] overflow-hidden flex flex-col transition-all duration-300 ${
       noSlotMargins || slotHideGrid
         ? 'bg-transparent border-none shadow-none' 
         : 'bg-black/75 rounded-xl border-x border-[#4d3d00]/60 shadow-[inset_0_0_20px_rgba(0,0,0,0.9)]'

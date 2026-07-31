@@ -1,7 +1,7 @@
 import React from 'react';
 import { SlotReel } from './SlotReel';
-import { SymbolType, SymbolImageConfig, SpinRollStyle } from '../types';
-import { LineWinResult } from '../slotEngine';
+import { SymbolType, SymbolImageConfig, SpinRollStyle, BoardType } from '../types';
+import { LineWinResult, getReelRowCount } from '../slotEngine';
 
 interface PaylineOverlayProps {
   winningLines: LineWinResult[];
@@ -9,6 +9,7 @@ interface PaylineOverlayProps {
   isSpinning: boolean;
   gridCols: number;
   gridRows: number;
+  boardType?: BoardType;
 }
 
 const PaylineOverlay: React.FC<PaylineOverlayProps> = ({
@@ -17,6 +18,7 @@ const PaylineOverlay: React.FC<PaylineOverlayProps> = ({
   isSpinning,
   gridCols,
   gridRows,
+  boardType,
 }) => {
   if (isSpinning || !winningLines || winningLines.length === 0 || gridCols <= 0 || gridRows <= 0) {
     return null;
@@ -50,7 +52,19 @@ const PaylineOverlay: React.FC<PaylineOverlayProps> = ({
 
         const points = line.coordinates.map(coord => {
           const x = ((coord.col + 0.5) / gridCols) * 100;
-          const y = ((coord.row + 0.5) / gridRows) * 100;
+          let y;
+          if (boardType === '3x4x3') {
+            const colRows = coord.col === 1 ? 4 : 3;
+            if (colRows === 3) {
+              const heightPct = 75;
+              const topPct = 12.5;
+              y = topPct + ((coord.row + 0.5) / 3) * heightPct;
+            } else {
+              y = ((coord.row + 0.5) / 4) * 100;
+            }
+          } else {
+            y = ((coord.row + 0.5) / gridRows) * 100;
+          }
           return { x, y };
         });
 
@@ -129,6 +143,7 @@ interface SlotMachineProps {
   anticipationExtraDelay?: number;
   cashAnticipationColor?: 'gold' | 'red' | 'purple' | 'cyan' | 'neon_green';
   spinRollStyle?: SpinRollStyle;
+  boardType?: BoardType;
 }
 
 export const SlotMachine: React.FC<SlotMachineProps> = ({ 
@@ -150,7 +165,8 @@ export const SlotMachine: React.FC<SlotMachineProps> = ({
   staggerDelay = 120,
   anticipationExtraDelay = 1800,
   cashAnticipationColor = 'gold',
-  spinRollStyle = 'standard'
+  spinRollStyle = 'standard',
+  boardType = '5x3'
 }) => {
   const gridCols = grid.length;
   const gridRows = grid[0]?.length || 3;
@@ -190,6 +206,7 @@ export const SlotMachine: React.FC<SlotMachineProps> = ({
           isSpinning={isSpinning}
           gridCols={gridCols}
           gridRows={gridRows}
+          boardType={boardType}
         />
 
         {grid.map((column, index) => {
@@ -231,6 +248,7 @@ export const SlotMachine: React.FC<SlotMachineProps> = ({
               slotHideGrid={slotHideGrid}
               anticipationColor={cashAnticipationColor}
               spinRollStyle={spinRollStyle}
+              maxRows={boardType === '3x4x3' ? 4 : undefined}
             />
           );
         })}

@@ -1203,6 +1203,7 @@ export const SlotEngineEditor: React.FC<SlotEngineEditorProps> = ({
                 >
                   <option value="3x1">3x1 (Retrô - 1 Linha x 3 Rolos)</option>
                   <option value="3x3">3x3 (Clássico - 3 Linhas x 3 Rolos)</option>
+                  <option value="3x4x3">3x4x3 (Asimétrico - 3-4-3 Rolos)</option>
                   <option value="4x3">4x3 (Moderno - 3 Linhas x 4 Rolos)</option>
                   <option value="4x4">4x4 (Quadrado - 4 Linhas x 4 Rolos)</option>
                   <option value="5x3">5x3 (Padrão Slot - 3 Linhas x 5 Rolos)</option>
