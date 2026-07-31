@@ -155,6 +155,28 @@ export const SlotMachine: React.FC<SlotMachineProps> = ({
   const gridCols = grid.length;
   const gridRows = grid[0]?.length || 3;
 
+  // Create normalized, case-insensitive copies of customSymbols and customSymbolConfigs
+  // This solves case mismatch between engine IDs (e.g. 'crown') and custom UI IDs (e.g. 'Crown')
+  const normalizedSymbols: Partial<Record<string, string>> = {};
+  if (customSymbols) {
+    Object.entries(customSymbols).forEach(([key, val]) => {
+      if (val) {
+        normalizedSymbols[key.toLowerCase()] = val as string;
+        normalizedSymbols[key] = val as string;
+      }
+    });
+  }
+
+  const normalizedConfigs: Partial<Record<string, SymbolImageConfig>> = {};
+  if (customSymbolConfigs) {
+    Object.entries(customSymbolConfigs).forEach(([key, val]) => {
+      if (val) {
+        normalizedConfigs[key.toLowerCase()] = val as SymbolImageConfig;
+        normalizedConfigs[key] = val as SymbolImageConfig;
+      }
+    });
+  }
+
   return (
     <div className="relative z-10 w-full h-full flex items-center justify-center p-0.5 sm:p-1 md:p-2">
       {/* Main Grid - Background is transparent to show background graphics */}
@@ -195,8 +217,8 @@ export const SlotMachine: React.FC<SlotMachineProps> = ({
               isSpinning={isSpinning}
               resultSymbols={column}
               delay={reelDelay}
-              customSymbols={customSymbols}
-              customSymbolConfigs={customSymbolConfigs}
+              customSymbols={normalizedSymbols}
+              customSymbolConfigs={normalizedConfigs}
               winningRows={winningRows}
               bonusPulsingRows={bonusPulsingRows}
               activeSymbols={activeSymbols}

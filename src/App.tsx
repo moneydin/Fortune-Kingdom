@@ -1223,6 +1223,8 @@ export default function App() {
               top: `${btn.posY}%`,
               left: `${btn.posX}%`,
               transform: `translate(-50%, -50%) scale(${btn.scale / 100})`,
+              width: btn.customWidth ? `${btn.customWidth}px` : undefined,
+              height: btn.customHeight ? `${btn.customHeight}px` : undefined,
             }}
             className={`z-20 whitespace-nowrap ${getCustomButtonStyles(btn)}`}
           >

@@ -40,6 +40,8 @@ export interface CustomButtonConfig {
   icon?: string;
   imageUrl?: string;
   isActive: boolean;
+  customWidth?: number; // custom width in px
+  customHeight?: number; // custom height in px
 }
 
 export type BoardType = '3x1' | '3x3' | '4x3' | '4x4' | '5x3' | '5x4' | '6x3' | '6x4' | '7x7';

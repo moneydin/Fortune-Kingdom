@@ -103,6 +103,7 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
   const [showGridLines, setShowGridLines] = useState<boolean>(true);
   const [dragPrecisionMode, setDragPrecisionMode] = useState<'fine' | 'normal'>('fine');
   const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
+  const [showPrecisionPanel, setShowPrecisionPanel] = useState<boolean>(true);
 
   // Infinite Canvas Panning & Zooming
   const [canvasPanX, setCanvasPanX] = useState<number>(0);
@@ -119,6 +120,10 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
     buttons: { x: 160, y: 270, isOpen: false, isCollapsed: false },
     hud: { x: 190, y: 300, isOpen: false, isCollapsed: false },
   });
+
+  // Floating positions for draggable studio controllers
+  const [precisionPanelPos, setPrecisionPanelPos] = useState({ x: 20, y: 540 });
+  const [hudControllerPos, setHudControllerPos] = useState({ x: 20, y: 20 });
 
   // Dragging states
   const previewCanvasRef = useRef<HTMLDivElement>(null);
@@ -525,6 +530,22 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
           y: dragStartRef.current.initialY + pixelDeltaY
         }
       }));
+      return;
+    } else if (draggingTarget === 'precisionPanel') {
+      const pixelDeltaX = e.clientX - dragStartRef.current.x;
+      const pixelDeltaY = e.clientY - dragStartRef.current.y;
+      setPrecisionPanelPos({
+        x: dragStartRef.current.initialX + pixelDeltaX,
+        y: dragStartRef.current.initialY + pixelDeltaY
+      });
+      return;
+    } else if (draggingTarget === 'hudController') {
+      const pixelDeltaX = e.clientX - dragStartRef.current.x;
+      const pixelDeltaY = e.clientY - dragStartRef.current.y;
+      setHudControllerPos({
+        x: dragStartRef.current.initialX + pixelDeltaX,
+        y: dragStartRef.current.initialY + pixelDeltaY
+      });
       return;
     }
 
@@ -2434,10 +2455,28 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
             </div>
           )}
 
-          {/* Elegant HUD Canvas Controller Overlay */}
-          <div className="absolute top-4 left-4 z-40 flex flex-col gap-2 pointer-events-auto">
+          {/* Elegant HUD Canvas Controller Overlay (Draggable) */}
+          <div 
+            style={{
+              position: 'absolute',
+              left: `${hudControllerPos.x}px`,
+              top: `${hudControllerPos.y}px`,
+              zIndex: 40,
+            }}
+            className="flex flex-col gap-2 pointer-events-auto select-none"
+          >
             {/* Tool Selection and Zoom controls group */}
-            <div className="bg-black/85 backdrop-blur-md border border-white/10 p-1.5 rounded-xl flex items-center gap-1.5 shadow-2xl">
+            <div 
+              onMouseDown={(e) => {
+                if (e.button !== 0 || (e.target as HTMLElement).closest('button')) return;
+                handleStartDrag('hudController', hudControllerPos.x, hudControllerPos.y, e.clientX, e.clientY);
+              }}
+              className="bg-black/85 backdrop-blur-md border border-white/10 p-1.5 rounded-xl flex items-center gap-1.5 shadow-2xl cursor-grab active:cursor-grabbing hover:bg-neutral-900 transition-colors"
+              title="Arraste para mover as ferramentas"
+            >
+              {/* Draggable Grip */}
+              <GripHorizontal className="w-3.5 h-3.5 text-amber-500/80 mr-0.5 cursor-grab" />
+
               {/* Select Tool */}
               <button
                 type="button"
@@ -2536,6 +2575,15 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                     </button>
                   );
                 })}
+                <div className="h-[1px] bg-white/10 my-1" />
+                <button
+                  type="button"
+                  onClick={() => setShowPrecisionPanel(prev => !prev)}
+                  className="w-full text-left px-2.5 py-1.5 text-[11px] font-bold rounded-lg transition flex items-center justify-between cursor-pointer text-gray-300 hover:bg-white/5 hover:text-white"
+                >
+                  <span>🎯 Precisão Pixel a Pixel</span>
+                  <span className={`w-2 h-2 rounded-full ${showPrecisionPanel ? 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.6)]' : 'bg-neutral-800'}`} />
+                </button>
               </div>
             </div>
           </div>
@@ -2607,6 +2655,397 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
               </div>
             );
           })}
+
+          {/* Draggable Pixel Precision Control Panel (Painel de Ajuste Fino por Pixels) */}
+          {showPrecisionPanel && (
+            <div 
+              style={{
+                position: 'absolute',
+                left: `${precisionPanelPos.x}px`,
+                top: `${precisionPanelPos.y}px`,
+                zIndex: 35,
+              }}
+              className="w-full max-w-[340px] bg-black/95 backdrop-blur-md border border-amber-500/50 rounded-2xl p-3 shadow-2xl space-y-2.5 select-none text-xs"
+            >
+              {/* Header with Grip & Actions */}
+              <div 
+                onMouseDown={(e) => {
+                  if (e.button !== 0 || (e.target as HTMLElement).closest('button')) return;
+                  handleStartDrag('precisionPanel', precisionPanelPos.x, precisionPanelPos.y, e.clientX, e.clientY);
+                }}
+                className="flex items-center justify-between border-b border-white/10 pb-1.5 cursor-grab active:cursor-grabbing hover:bg-white/5 px-1 rounded transition"
+              >
+                <div className="flex items-center gap-1.5">
+                  <GripHorizontal className="w-3.5 h-3.5 text-amber-500" />
+                  <span className="text-[10px] font-black uppercase text-amber-300 tracking-wider">
+                    Ajuste Fino Pixel a Pixel
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {/* Step Selector */}
+                  <div className="flex items-center gap-0.5">
+                    {[1, 5, 10].map((step) => (
+                      <button
+                        key={step}
+                        type="button"
+                        onClick={() => setNudgeStep(step)}
+                        className={`px-1 py-0.5 rounded text-[8px] font-black transition cursor-pointer ${
+                          nudgeStep === step 
+                            ? 'bg-amber-400 text-black font-bold' 
+                            : 'bg-neutral-800 text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        {step}px
+                      </button>
+                    ))}
+                  </div>
+                  {/* Close button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowPrecisionPanel(false)}
+                    className="p-1 hover:bg-red-900/60 text-gray-400 hover:text-red-400 rounded transition cursor-pointer"
+                    title="Ocultar Painel"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Target Element Selector GRID */}
+              <div className="grid grid-cols-5 gap-1">
+                {[
+                  { id: 'phone', label: '📱 Celular', valX: adminConfig.phonePosX ?? 0, valY: adminConfig.phonePosY ?? 0, unit: 'px' },
+                  { id: 'background', label: '🖼️ Imagem', valX: adminConfig.bgPosX ?? 0, valY: adminConfig.bgPosY ?? 0, unit: '%' },
+                  { id: 'toolbar', label: '🎯 Ferramenta', valX: adminConfig.toolbarPosX ?? 0, valY: adminConfig.toolbarPosY ?? 0, unit: 'px' },
+                  { id: 'slot', label: '🎰 Slot', valX: adminConfig.slotLeft ?? 4, valY: adminConfig.slotTop ?? 28, unit: '%' },
+                  { id: 'spin', label: '🔘 Girar', valX: adminConfig.spinLeft ?? 50, valY: adminConfig.spinBottom ?? 4, unit: '%' },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setNudgeTarget(t.id as any)}
+                    className={`p-1 rounded-lg text-center transition cursor-pointer border ${
+                      nudgeTarget === t.id
+                        ? 'bg-amber-500/20 border-amber-400 text-amber-300 font-black shadow-md'
+                        : 'bg-neutral-900/90 border-white/10 text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <div className="text-[8px] font-black leading-tight truncate">{t.label}</div>
+                    <div className="text-[7px] font-mono opacity-80 mt-0.5">
+                      {t.valX}{t.unit},{t.valY}{t.unit}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Dynamic selection feedback for custom elements (button / text) */}
+              {nudgeTarget && !['phone', 'background', 'toolbar', 'slot', 'spin'].includes(nudgeTarget) && (() => {
+                const isBtn = nudgeTarget.startsWith('button-');
+                const isTxt = nudgeTarget.startsWith('text-');
+                let label = 'Custom Item';
+                let coords = '';
+                if (isBtn) {
+                  const btnId = nudgeTarget.replace('button-', '');
+                  const btn = (adminConfig.customButtons || []).find(b => b.id === btnId);
+                  label = btn ? `🔘 ${btn.label}` : 'Botão';
+                  coords = btn ? `X:${btn.posX}% Y:${btn.posY}%` : '';
+                } else if (isTxt) {
+                  const txtId = nudgeTarget.replace('text-', '');
+                  const txt = (adminConfig.customTexts || []).find(t => t.id === txtId);
+                  label = txt ? `📜 ${txt.text.substring(0, 10)}` : 'Texto';
+                  coords = txt ? `X:${txt.posX}% Y:${txt.posY}%` : '';
+                }
+                return (
+                  <div className="bg-neutral-900/80 border border-white/5 rounded-lg p-1.5 flex justify-between items-center px-2">
+                    <span className="text-[9px] font-black text-amber-400 uppercase tracking-wider truncate max-w-[180px]">{label}</span>
+                    <span className="text-[8px] font-mono text-gray-400">{coords}</span>
+                  </div>
+                );
+              })()}
+
+              {/* Directional pad & reset buttons group */}
+              <div className="flex items-center justify-between gap-2 bg-neutral-950 p-2 rounded-xl border border-white/5">
+                <div className="text-[9px] text-gray-300 leading-normal max-w-[100px]">
+                  <span className="font-bold text-amber-300 block truncate">{nudgeTarget || 'Nenhum Alvo'}</span>
+                  <span className="text-[8px] text-gray-400">Arraste para mover, ou use as setas</span>
+                </div>
+
+                {/* 4-Way Arrow Pad */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    title={`Mover p/ Esquerda (${nudgeStep}px)`}
+                    onClick={() => handleNudge(-1, 0)}
+                    disabled={!nudgeTarget}
+                    className="p-1.5 bg-neutral-800 hover:bg-amber-500 hover:text-black text-gray-200 disabled:opacity-30 disabled:pointer-events-none rounded-lg border border-white/5 transition cursor-pointer active:scale-95"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                  </button>
+
+                  <div className="flex flex-col gap-1">
+                    <button
+                      type="button"
+                      title={`Mover p/ Cima (${nudgeStep}px)`}
+                      onClick={() => handleNudge(0, -1)}
+                      disabled={!nudgeTarget}
+                      className="p-1.5 bg-neutral-800 hover:bg-amber-500 hover:text-black text-gray-200 disabled:opacity-30 disabled:pointer-events-none rounded-lg border border-white/5 transition cursor-pointer active:scale-95"
+                    >
+                      <ArrowUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      title={`Mover p/ Baixo (${nudgeStep}px)`}
+                      onClick={() => handleNudge(0, 1)}
+                      disabled={!nudgeTarget}
+                      className="p-1.5 bg-neutral-800 hover:bg-amber-500 hover:text-black text-gray-200 disabled:opacity-30 disabled:pointer-events-none rounded-lg border border-white/5 transition cursor-pointer active:scale-95"
+                    >
+                      <ArrowDown className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    title={`Mover p/ Direita (${nudgeStep}px)`}
+                    onClick={() => handleNudge(1, 0)}
+                    disabled={!nudgeTarget}
+                    className="p-1.5 bg-neutral-800 hover:bg-amber-500 hover:text-black text-gray-200 disabled:opacity-30 disabled:pointer-events-none rounded-lg border border-white/5 transition cursor-pointer active:scale-95"
+                  >
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Reset Selected Element Position */}
+                  <button
+                    type="button"
+                    title="Resetar Posições do Estúdio"
+                    onClick={() => {
+                      onUpdateAdminConfig({
+                        phonePosX: 0,
+                        phonePosY: 0,
+                        toolbarPosX: 0,
+                        toolbarPosY: 0,
+                        slotLeft: 4,
+                        slotTop: 28,
+                        spinLeft: 50,
+                        spinBottom: 4
+                      });
+                    }}
+                    className="p-1.5 ml-0.5 bg-red-950/80 hover:bg-red-600 text-red-300 hover:text-white rounded-lg border border-red-500/30 transition cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Dynamic Dimension Adjustment Sliders Section - Requested feature! */}
+              {nudgeTarget && (
+                <div className="bg-neutral-900/60 border border-white/5 rounded-xl p-2 space-y-2 text-[10px]">
+                  <div className="text-[9px] font-black uppercase text-amber-400/80 tracking-wider flex items-center gap-1.5">
+                    <Maximize2 className="w-3 h-3 text-amber-500" />
+                    <span>Ajustar Largura, Altura & Escala</span>
+                  </div>
+
+                  {/* A. Phone width */}
+                  {nudgeTarget === 'phone' && (
+                    <div className="space-y-1">
+                      <div className="flex justify-between font-bold text-gray-300">
+                        <span>Largura do Celular:</span>
+                        <span className="text-yellow-400 font-mono">{phoneWidth}px</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="240"
+                        max="650"
+                        step="10"
+                        value={phoneWidth}
+                        onChange={(e) => setPhoneWidth(parseInt(e.target.value) || 360)}
+                        className="w-full accent-amber-500 h-1 cursor-pointer bg-neutral-800 rounded-lg"
+                      />
+                    </div>
+                  )}
+
+                  {/* B. Background scale */}
+                  {nudgeTarget === 'background' && (
+                    <div className="space-y-1.5">
+                      <div>
+                        <div className="flex justify-between font-bold text-gray-300">
+                          <span>Escala / Zoom da Imagem:</span>
+                          <span className="text-yellow-400 font-mono">{adminConfig.bgScale ?? 100}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="50"
+                          max="500"
+                          step="5"
+                          value={adminConfig.bgScale ?? 100}
+                          onChange={(e) => onUpdateAdminConfig({ bgScale: parseInt(e.target.value) })}
+                          className="w-full accent-amber-500 h-1 cursor-pointer bg-neutral-800 rounded-lg"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* C. Slot dimensions */}
+                  {nudgeTarget === 'slot' && (
+                    <div className="space-y-1.5">
+                      <div>
+                        <div className="flex justify-between font-bold text-gray-300">
+                          <span>Largura do Slot (%):</span>
+                          <span className="text-yellow-400 font-mono">{adminConfig.slotWidth ?? 92}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="20"
+                          max="100"
+                          step="1"
+                          value={adminConfig.slotWidth ?? 92}
+                          onChange={(e) => onUpdateAdminConfig({ slotWidth: parseInt(e.target.value) })}
+                          className="w-full accent-amber-500 h-1 cursor-pointer bg-neutral-800 rounded-lg"
+                        />
+                      </div>
+                      <div>
+                        <div className="flex justify-between font-bold text-gray-300">
+                          <span>Altura do Slot (%):</span>
+                          <span className="text-yellow-400 font-mono">{adminConfig.slotHeight ?? 50}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="20"
+                          max="100"
+                          step="1"
+                          value={adminConfig.slotHeight ?? 50}
+                          onChange={(e) => onUpdateAdminConfig({ slotHeight: parseInt(e.target.value) })}
+                          className="w-full accent-amber-500 h-1 cursor-pointer bg-neutral-800 rounded-lg"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* D. Spin scale */}
+                  {nudgeTarget === 'spin' && (
+                    <div className="space-y-1">
+                      <div className="flex justify-between font-bold text-gray-300">
+                        <span>Escala do Botão Girar:</span>
+                        <span className="text-yellow-400 font-mono">{adminConfig.spinScale ?? 100}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="40"
+                        max="250"
+                        step="5"
+                        value={adminConfig.spinScale ?? 100}
+                        onChange={(e) => onUpdateAdminConfig({ spinScale: parseInt(e.target.value) })}
+                        className="w-full accent-amber-500 h-1 cursor-pointer bg-neutral-800 rounded-lg"
+                      />
+                    </div>
+                  )}
+
+                  {/* E. Custom Button scales & customWidth / customHeight */}
+                  {nudgeTarget.startsWith('button-') && (() => {
+                    const btnId = nudgeTarget.replace('button-', '');
+                    const btn = (adminConfig.customButtons || []).find(b => b.id === btnId);
+                    if (!btn) return <div className="text-[8px] text-red-400 font-bold">Botão não encontrado</div>;
+
+                    const updateBtnProperty = (updates: Partial<CustomButtonConfig>) => {
+                      const updated = (adminConfig.customButtons || []).map(b => 
+                        b.id === btnId ? { ...b, ...updates } : b
+                      );
+                      onUpdateAdminConfig({ customButtons: updated });
+                    };
+
+                    return (
+                      <div className="space-y-1.5">
+                        <div className="text-[9px] font-black text-gray-400">
+                          Editar Botão: <span className="text-amber-300">"{btn.label || btn.id}"</span>
+                        </div>
+                        <div>
+                          <div className="flex justify-between font-bold text-gray-300">
+                            <span>Escala do Botão (%):</span>
+                            <span className="text-yellow-400 font-mono">{btn.scale}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="40"
+                            max="250"
+                            step="5"
+                            value={btn.scale}
+                            onChange={(e) => updateBtnProperty({ scale: parseInt(e.target.value) })}
+                            className="w-full accent-amber-500 h-1 cursor-pointer bg-neutral-800 rounded-lg"
+                          />
+                        </div>
+                        <div>
+                          <div className="flex justify-between font-bold text-gray-300">
+                            <span>Largura (px, 0 = Auto):</span>
+                            <span className="text-yellow-400 font-mono">{btn.customWidth || 'Automático'}</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="300"
+                            step="5"
+                            value={btn.customWidth || 0}
+                            onChange={(e) => updateBtnProperty({ customWidth: parseInt(e.target.value) || undefined })}
+                            className="w-full accent-amber-500 h-1 cursor-pointer bg-neutral-800 rounded-lg"
+                          />
+                        </div>
+                        <div>
+                          <div className="flex justify-between font-bold text-gray-300">
+                            <span>Altura (px, 0 = Auto):</span>
+                            <span className="text-yellow-400 font-mono">{btn.customHeight || 'Automático'}</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="150"
+                            step="5"
+                            value={btn.customHeight || 0}
+                            onChange={(e) => updateBtnProperty({ customHeight: parseInt(e.target.value) || undefined })}
+                            className="w-full accent-amber-500 h-1 cursor-pointer bg-neutral-800 rounded-lg"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* F. Custom Text font size */}
+                  {nudgeTarget.startsWith('text-') && (() => {
+                    const txtId = nudgeTarget.replace('text-', '');
+                    const txt = (adminConfig.customTexts || []).find(t => t.id === txtId);
+                    if (!txt) return <div className="text-[8px] text-red-400 font-bold">Texto não encontrado</div>;
+
+                    const updateTxtProperty = (updates: Partial<CustomTextConfig>) => {
+                      const updated = (adminConfig.customTexts || []).map(t =>
+                        t.id === txtId ? { ...t, ...updates } : t
+                      );
+                      onUpdateAdminConfig({ customTexts: updated });
+                    };
+
+                    return (
+                      <div className="space-y-1.5">
+                        <div className="text-[9px] font-black text-gray-400">
+                          Editar Texto: <span className="text-amber-300">"{txt.text.substring(0, 15)}"</span>
+                        </div>
+                        <div>
+                          <div className="flex justify-between font-bold text-gray-300">
+                            <span>Tamanho da Fonte (px):</span>
+                            <span className="text-yellow-400 font-mono">{txt.fontSize}px</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="8"
+                            max="80"
+                            step="1"
+                            value={txt.fontSize}
+                            onChange={(e) => updateTxtProperty({ fontSize: parseInt(e.target.value) })}
+                            className="w-full accent-amber-500 h-1 cursor-pointer bg-neutral-800 rounded-lg"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Preview Control Header: Tabuleiro e Rolagem Selector Bar (Draggable) */}
           <div 
@@ -3544,6 +3983,8 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                     top: `${btn.posY}%`,
                     left: `${btn.posX}%`,
                     transform: `translate(-50%, -50%) scale(${btn.scale / 100})`,
+                    width: btn.customWidth ? `${btn.customWidth}px` : undefined,
+                    height: btn.customHeight ? `${btn.customHeight}px` : undefined,
                   }}
                   className={`z-30 cursor-move whitespace-nowrap select-none ${getCustomButtonStyles(btn)}`}
                 >
@@ -3651,131 +4092,6 @@ export const CriadorDesignerModal: React.FC<CriadorDesignerModalProps> = ({
                   )}
                 </div>
               ))}
-            </div>
-          </div>
-
-          {/* Pixel Precision Control Panel (Painel de Ajuste Fino por Pixels) */}
-          <div className="w-full max-w-[440px] bg-black/90 backdrop-blur-md border border-amber-500/40 rounded-2xl p-2.5 mt-3 shadow-xl z-30 space-y-2 select-none">
-            <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
-              <div className="flex items-center gap-1.5">
-                <Crosshair className="w-4 h-4 text-amber-400" />
-                <span className="text-[11px] font-black uppercase text-amber-300 tracking-wider">
-                  Controle de Precisão Pixel a Pixel
-                </span>
-              </div>
-
-              {/* Step selector */}
-              <div className="flex items-center gap-1">
-                <span className="text-[9px] text-gray-400 font-bold uppercase">Passo:</span>
-                {[1, 5, 10].map((step) => (
-                  <button
-                    key={step}
-                    type="button"
-                    onClick={() => setNudgeStep(step)}
-                    className={`px-1.5 py-0.5 rounded text-[9px] font-black transition cursor-pointer ${
-                      nudgeStep === step ? 'bg-amber-400 text-black font-bold' : 'bg-neutral-800 text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    {step}px
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Target Element Selector */}
-            <div className="grid grid-cols-5 gap-1">
-              {[
-                { id: 'phone', label: '📱 Celular', valX: adminConfig.phonePosX ?? 0, valY: adminConfig.phonePosY ?? 0, unit: 'px' },
-                { id: 'background', label: '🖼️ Imagem', valX: adminConfig.bgPosX ?? 0, valY: adminConfig.bgPosY ?? 0, unit: '%' },
-                { id: 'toolbar', label: '🎯 Ferramenta', valX: adminConfig.toolbarPosX ?? 0, valY: adminConfig.toolbarPosY ?? 0, unit: 'px' },
-                { id: 'slot', label: '🎰 Slot', valX: adminConfig.slotLeft ?? 4, valY: adminConfig.slotTop ?? 28, unit: '%' },
-                { id: 'spin', label: '🔘 Girar', valX: adminConfig.spinLeft ?? 50, valY: adminConfig.spinBottom ?? 4, unit: '%' },
-              ].map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setNudgeTarget(t.id as any)}
-                  className={`p-1.5 rounded-lg text-center transition cursor-pointer border ${
-                    nudgeTarget === t.id
-                      ? 'bg-amber-500/20 border-amber-400 text-amber-300 font-black shadow-md'
-                      : 'bg-neutral-900/90 border-white/10 text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <div className="text-[10px] font-bold leading-tight">{t.label}</div>
-                  <div className="text-[8px] font-mono opacity-80 mt-0.5">
-                    X:{t.valX}{t.unit} Y:{t.valY}{t.unit}
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            {/* Arrow Nudge Pad & Numerical Controls */}
-            <div className="flex items-center justify-between gap-3 bg-black/60 p-2 rounded-xl border border-white/10">
-              <div className="text-[10px] text-gray-300">
-                <span className="font-bold text-amber-300 uppercase block">Ajuste Direcional:</span>
-                <span className="text-[9px] text-gray-400">Mover {nudgeTarget} em {nudgeStep}px</span>
-              </div>
-
-              {/* 4-Way Arrow Pad */}
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  title={`Mover p/ Esquerda (${nudgeStep}px)`}
-                  onClick={() => handleNudge(-1, 0)}
-                  className="p-2 bg-neutral-800 hover:bg-amber-500 hover:text-black text-gray-200 rounded-lg border border-white/10 transition cursor-pointer active:scale-95"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                </button>
-
-                <div className="flex flex-col gap-1">
-                  <button
-                    type="button"
-                    title={`Mover p/ Cima (${nudgeStep}px)`}
-                    onClick={() => handleNudge(0, -1)}
-                    className="p-2 bg-neutral-800 hover:bg-amber-500 hover:text-black text-gray-200 rounded-lg border border-white/10 transition cursor-pointer active:scale-95"
-                  >
-                    <ArrowUp className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    title={`Mover p/ Baixo (${nudgeStep}px)`}
-                    onClick={() => handleNudge(0, 1)}
-                    className="p-2 bg-neutral-800 hover:bg-amber-500 hover:text-black text-gray-200 rounded-lg border border-white/10 transition cursor-pointer active:scale-95"
-                  >
-                    <ArrowDown className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  title={`Mover p/ Direita (${nudgeStep}px)`}
-                  onClick={() => handleNudge(1, 0)}
-                  className="p-2 bg-neutral-800 hover:bg-amber-500 hover:text-black text-gray-200 rounded-lg border border-white/10 transition cursor-pointer active:scale-95"
-                >
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-
-                {/* Reset Selected Element Position */}
-                <button
-                  type="button"
-                  title="Resetar Posições do Estúdio"
-                  onClick={() => {
-                    onUpdateAdminConfig({
-                      phonePosX: 0,
-                      phonePosY: 0,
-                      toolbarPosX: 0,
-                      toolbarPosY: 0,
-                      slotLeft: 4,
-                      slotTop: 28,
-                      spinLeft: 50,
-                      spinBottom: 4
-                    });
-                  }}
-                  className="p-2 ml-1 bg-red-950/80 hover:bg-red-600 text-red-300 hover:text-white rounded-lg border border-red-500/30 transition cursor-pointer"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                </button>
-              </div>
             </div>
           </div>
 
